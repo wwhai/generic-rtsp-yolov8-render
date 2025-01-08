@@ -1,0 +1,72 @@
+# Compiled object files
+generic-rtsp-yolov8-render
+*.o
+*.ko
+*.obj
+*.elf
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Libraries
+*.so
+*.a
+*.lib
+*.dll
+*.dylib
+
+# Executables
+*.exe
+*.out
+*.app
+*.bin
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# Dependency directories
+deps/
+vendor/
+
+# Build directories
+build/
+Debug/
+Release/
+dist/
+out/
+
+# IDE files
+.idea/
+.vscode/
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.sublime-project
+*.sublime-workspace
+
+# Backup files
+*~
+*.bak
+*.swp
+*.tmp
+
+# Generated files
+CMakeFiles/
+CMakeCache.txt
+CMakeScripts/
+cmake_install.cmake
+Makefile
+Makefile.in
+config.log
+config.status
+compile_commands.json
+
+# Package directories
+node_modules/
+package-lock.json
+yarn.lock
