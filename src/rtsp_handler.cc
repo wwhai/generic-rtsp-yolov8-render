@@ -29,7 +29,7 @@ extern "C"
 
 void *rtsp_handler_thread(void *arg)
 {
-    const RTSPThreadArgs *args = (RTSPThreadArgs *)arg;
+    const ThreadArgs *args = (ThreadArgs *)arg;
     AVFormatContext *fmt_ctx = NULL;
     int ret;
 
@@ -80,7 +80,7 @@ void *rtsp_handler_thread(void *arg)
     // Get the codec parameters of the video stream
     AVCodecParameters *codecpar = fmt_ctx->streams[video_stream_index]->codecpar;
     // Find the decoder for the video stream
-    AVCodec *decoder = avcodec_find_decoder(codecpar->codec_id);
+    const AVCodec *decoder = avcodec_find_decoder(codecpar->codec_id);
     if (!decoder)
     {
         fprintf(stderr, "Error: Failed to find decoder for codec ID %d.\n", codecpar->codec_id);
@@ -138,6 +138,10 @@ void *rtsp_handler_thread(void *arg)
     // Read frames from the stream
     while (av_read_frame(fmt_ctx, origin_packet) >= 0)
     {
+        if (args->ctx->is_cancelled)
+        {
+            goto END;
+        }
         if (origin_packet->stream_index == video_stream_index)
         {
             // Send the packet to the decoder
@@ -196,11 +200,11 @@ void *rtsp_handler_thread(void *arg)
         av_packet_unref(origin_packet);
     }
 
-    // Cleanup
-    printf("RTSP handler thread finished.\n");
+END:
     avcodec_free_context(&codec_ctx);
     av_packet_free(&origin_packet);
     avformat_close_input(&fmt_ctx);
     avformat_network_deinit();
     pthread_exit(NULL);
+    return (void *)NULL;
 }

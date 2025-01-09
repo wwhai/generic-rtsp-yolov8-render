@@ -13,10 +13,28 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef RTSP_HANDLER_H
-#define RTSP_HANDLER_H
-#include "thread_args.h"
+#ifndef CONTEXT_H
+#define CONTEXT_H
 
-void *rtsp_handler_thread(void *arg);
+#include <pthread.h>
 
-#endif // RTSP_HANDLER_H
+typedef struct
+{
+    pthread_mutex_t mtx;
+    pthread_cond_t cond;
+    int is_cancelled;
+} Context;
+
+// 创建 Context 结构体
+Context *CreateContext();
+
+// 取消 Context
+void CancelContext(Context *ctx);
+
+// 检查是否已取消
+int IsCancelled(Context *ctx);
+
+// 工作线程函数
+void *workerFunction(void *arg);
+
+#endif

@@ -14,7 +14,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "sdl_utils.h"
-
+#include "frame_queue.h"
 void NV12ToRGB(uint8_t *y_plane, uint8_t *uv_plane, int width,
                int height, int y_pitch, int uv_pitch, uint8_t *rgb_buffer)
 {
@@ -131,33 +131,81 @@ void SDLDrawText(SDL_Renderer *renderer, SDL_Texture *texture, TTF_Font *font, c
     SDL_DestroyTexture(textTexture);
 }
 // 绘制标签
-void SDLDrawLabel(SDL_Renderer *renderer, SDL_Texture *texture, TTF_Font *font, const char *text, int x, int y)
+void SDLDrawLabel(SDL_Renderer *renderer, TTF_Font *font, const char *text, int x, int y, SDL_Color textColor, SDL_Color backgroundColor)
 {
-    // 设置标签颜色
-    SDL_Color labelColor = {255, 0, 0, 255};
-    // 创建标签表面
-    SDL_Surface *labelSurface = TTF_RenderText_Solid(font, text, labelColor);
-    if (labelSurface == NULL)
+    // 创建文本表面
+    SDL_Surface *textSurface = TTF_RenderText_Solid(font, text, textColor);
+    if (!textSurface)
     {
-        fprintf(stderr, "Failed to render label: %s\n", TTF_GetError());
+        printf("Unable to render text surface! SDL_ttf Error: %s\n", TTF_GetError());
         return;
     }
-    // 创建纹理
-    SDL_Texture *labelTexture = SDL_CreateTextureFromSurface(renderer, labelSurface);
-    if (labelTexture == NULL)
+    // 创建一个矩形作为背景
+    SDL_Rect backgroundRect = {x, y, textSurface->w, textSurface->h};
+
+    // 绘制背景色
+    SDL_SetRenderDrawColor(renderer, backgroundColor.r, backgroundColor.g, backgroundColor.b, backgroundColor.a);
+    SDL_RenderFillRect(renderer, &backgroundRect);
+    // 创建一个纹理用于渲染文本
+    SDL_Texture *textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
+    SDL_FreeSurface(textSurface);
+
+    if (!textTexture)
     {
-        fprintf(stderr, "Failed to create texture from surface: %s\n", SDL_GetError());
-        SDL_FreeSurface(labelSurface);
+        printf("Unable to create texture from rendered text! SDL_Error: %s\n", SDL_GetError());
         return;
     }
-    // 绘制填充矩形
-    SDL_Rect fillRect = {x, y, labelSurface->w, labelSurface->h};
-    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
-    SDL_RenderFillRect(renderer, &fillRect);
+
     // 绘制文本
-    SDL_Rect textRect = {x, y, labelSurface->w, labelSurface->h};
-    SDL_RenderCopy(renderer, labelTexture, NULL, &textRect);
-    // 释放资源
-    SDL_FreeSurface(labelSurface);
-    SDL_DestroyTexture(labelTexture);
+    SDL_Rect textRect = {x, y, textSurface->w, textSurface->h};
+    SDL_RenderCopy(renderer, textTexture, NULL, &textRect);
+    SDL_DestroyTexture(textTexture);
+}
+
+void SDLDrawBox(SDL_Renderer *renderer, TTF_Font *font, const char *text,
+                int x, int y, int w, int h, int thickness)
+{
+    // Draw the rectangle with the specified thickness
+    SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+
+    // Draw top border
+    SDL_Rect top = {x, y, w, thickness};
+    SDL_RenderFillRect(renderer, &top);
+
+    // Draw bottom border
+    SDL_Rect bottom = {x, y + h - thickness, w, thickness};
+    SDL_RenderFillRect(renderer, &bottom);
+
+    // Draw left border
+    SDL_Rect left = {x, y, thickness, h};
+    SDL_RenderFillRect(renderer, &left);
+
+    // Draw right border
+    SDL_Rect right = {x + w - thickness, y, thickness, h};
+    SDL_RenderFillRect(renderer, &right);
+
+    // Render text above the rectangle
+    if (text != NULL)
+    {
+        SDL_Color textColor = {255, 0, 0, 0}; // White color
+        SDL_Surface *textSurface = TTF_RenderText_Solid(font, text, textColor);
+        SDL_Texture *textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
+
+        SDL_Rect textRect;
+        textRect.x = x;
+        textRect.y = y - textSurface->h; // Position text above the rectangle
+        textRect.w = textSurface->w;
+        textRect.h = textSurface->h;
+
+        SDL_RenderCopy(renderer, textTexture, NULL, &textRect);
+
+        SDL_FreeSurface(textSurface);
+        SDL_DestroyTexture(textTexture);
+    }
+}
+void RenderBox(SDL_Renderer *renderer, Box *box)
+{
+    SDL_Rect rect = {box->x, box->y, box->w, box->h};
+    SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // 红色
+    SDL_RenderDrawRect(renderer, &rect);
 }

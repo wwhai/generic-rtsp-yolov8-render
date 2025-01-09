@@ -16,7 +16,15 @@
 #ifndef VIDEO_RENDERER_H
 #define VIDEO_RENDERER_H
 
+extern "C"
+{
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_ttf.h>
+}
 #include "frame_queue.h"
+#include "libav_utils.h"
+#include "sdl_utils.h"
+#include "thread_args.h"
 
 void *video_renderer_thread(void *arg);
 

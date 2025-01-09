@@ -18,6 +18,6 @@
 
 #include "frame_queue.h"
 
-void *detection_thread_func(void *arg);
+void *frame_detection_thread(void *arg);
 
 #endif // DETECTION_THREAD_H

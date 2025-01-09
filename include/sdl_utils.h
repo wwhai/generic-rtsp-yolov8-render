@@ -22,41 +22,64 @@ extern "C"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 }
-
-// @param y_plane Y平面
-// @param uv_plane UV平面
-// @param width 宽度
-// @param height 高度
-// @param y_pitch Y平面的步长
-// @param uv_pitch UV平面的步长
-// @param rgb_buffer 输出RGB数据的缓冲区
+#include "frame_queue.h"
+/// @brief
+/// @param y_plane
+/// @param uv_plane
+/// @param width
+/// @param height
+/// @param y_pitch
+/// @param uv_pitch
+/// @param rgb_buffer
 void NV12ToRGB(uint8_t *y_plane, uint8_t *uv_plane, int width,
                int height, int y_pitch, int uv_pitch, uint8_t *rgb_buffer);
 
-// @param frame 必须是NV12格式
-// @param texture 必须是YUV420P格式
-// @param renderer 必须是YUV420P格式
+/// @brief
+/// @param renderer
+/// @param texture
+/// @param frame
 void SDLDisplayNV12Frame(SDL_Renderer *renderer, SDL_Texture *texture, AVFrame *frame);
 
-// 绘制矩形
-// @param renderer 渲染器
-// @param texture 纹理
-// @param rect 矩形
+/// @brief
+/// @param renderer
+/// @param texture
+/// @param rect
 void SDLDrawRect(SDL_Renderer *renderer, SDL_Texture *texture, SDL_Rect *rect);
-// 绘制文本
-// @param renderer 渲染器
-// @param texture 纹理
-// @param text 文本
-// @param x 文本的x坐标
-// @param y 文本的y坐标
-void SDLDrawText(SDL_Renderer *renderer, SDL_Texture *texture, TTF_Font *font, const char *text, int x, int y);
 
-// 绘制标签
-// @param renderer 渲染器
-// @param texture 纹理
-// @param text 文本
-// @param x 文本的x坐标
-// @param y 文本的y坐标
-void SDLDrawLabel(SDL_Renderer *renderer, SDL_Texture *texture, TTF_Font *font, const char *text, int x, int y);
+/// @brief
+/// @param renderer
+/// @param texture
+/// @param font
+/// @param text
+/// @param x
+/// @param y
+void SDLDrawText(SDL_Renderer *renderer, SDL_Texture *texture, TTF_Font *font,
+                 const char *text, int x, int y);
+
+/// @brief
+/// @param renderer
+/// @param texture
+/// @param font
+/// @param text
+/// @param x
+/// @param y
+void SDLDrawLabel(SDL_Renderer *renderer, TTF_Font *font, const char *text,
+                  int x, int y, SDL_Color textColor, SDL_Color backgroundColor);
+/// @brief
+/// @param renderer
+/// @param font
+/// @param text
+/// @param x
+/// @param y
+/// @param w
+/// @param h
+/// @param thickness
+void SDLDrawBox(SDL_Renderer *renderer, TTF_Font *font, const char *text,
+                int x, int y, int w, int h, int thickness);
+
+/// @brief
+/// @param renderer
+/// @param box
+void RenderBox(SDL_Renderer *renderer, Box *box);
 
 #endif

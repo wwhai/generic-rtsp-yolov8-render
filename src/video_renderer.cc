@@ -14,17 +14,11 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "video_renderer.h"
-extern "C"
-{
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_ttf.h>
-}
-#include "frame_queue.h"
-#include "libav_utils.h"
-#include "sdl_utils.h"
+#define TARGET_FPS 30                  // 目标帧率
+#define FRAME_TIME (1000 / TARGET_FPS) // 每帧目标时间 (毫秒)
 void *video_renderer_thread(void *arg)
 {
-    FrameQueue *video_queue = (FrameQueue *)arg;
+    ThreadArgs *args = (ThreadArgs *)arg;
 
     if (SDL_Init(SDL_INIT_EVERYTHING) != 0)
     {
@@ -48,7 +42,7 @@ void *video_renderer_thread(void *arg)
         return NULL;
     }
 
-    SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+    SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if (!renderer)
     {
         fprintf(stderr, "SDL_CreateRenderer Error: %s\n", SDL_GetError());
@@ -58,7 +52,7 @@ void *video_renderer_thread(void *arg)
     }
 
     SDL_Texture *texture = SDL_CreateTexture(renderer,
-                                             SDL_PIXELFORMAT_IYUV, SDL_TEXTUREACCESS_STREAMING,
+                                             SDL_PIXELFORMAT_YV12, SDL_TEXTUREACCESS_STREAMING,
                                              1920, 1080);
     if (!texture)
     {
@@ -82,63 +76,113 @@ void *video_renderer_thread(void *arg)
 
     int frameCount = 0;
     float fps = 0;
-    char fpsLabel[20] = {0};
+    char fpsLabel[20] = "FPS:00";
     Uint64 currentFrameTime = 0;
     Uint64 lastFrameTime = SDL_GetPerformanceCounter();
     Uint64 performanceFrequency = SDL_GetPerformanceFrequency();
-    SDL_Rect rect = {0, 0, 20, 20};
     SDL_Event event;
+    // loop
     while (1)
     {
-        SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+        Uint32 frameStart = SDL_GetTicks();
 
-        QueueItem item;
-        memset(&item, 0, sizeof(QueueItem));
-        if (dequeue(video_queue, &item))
+        if (args->ctx->is_cancelled)
         {
-            if (item.type == ONLY_FRAME && item.data != NULL)
+            goto END;
+        }
+
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        SDL_RenderClear(renderer);
+
+        // 处理视频队列中的帧
+        QueueItem frame_item;
+        memset(&frame_item, 0, sizeof(QueueItem));
+
+        if (dequeue(args->video_queue, &frame_item))
+        {
+            if (frame_item.type == ONLY_FRAME && frame_item.data != NULL)
             {
-                AVFrame *newFrame = (AVFrame *)item.data;
-                SDL_UpdateYUVTexture(texture, NULL,
-                                     newFrame->data[0], newFrame->linesize[0],
-                                     newFrame->data[1], newFrame->linesize[1],
-                                     newFrame->data[2], newFrame->linesize[2]);
+                AVFrame *newFrame = (AVFrame *)frame_item.data;
+                int ret = SDL_UpdateYUVTexture(texture, NULL,
+                                               newFrame->data[0], newFrame->linesize[0],
+                                               newFrame->data[1], newFrame->linesize[1],
+                                               newFrame->data[2], newFrame->linesize[2]);
+                if (ret < 0)
+                {
+                    fprintf(stderr, "SDL_UpdateYUVTexture failed: %s\n", SDL_GetError());
+                }
                 av_frame_free(&newFrame);
             }
         }
-        else
-        {
-            SDL_Delay(10);
-        }
-        SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
-        if (SDL_RenderDrawRect(renderer, &rect) < 0)
-        {
-            fprintf(stderr, "Could not draw rectangle! SDL_Error: %s\n", SDL_GetError());
-        }
 
         SDL_RenderCopy(renderer, texture, NULL, NULL);
-        SDL_RenderPresent(renderer);
 
+        // 处理检测结果队列
+        QueueItem boxes_item;
+        if (dequeue(args->box_queue, &boxes_item))
+        {
+            // printf("<<< dequeue(args->box_queue, &boxes_item)\n");
+            if (boxes_item.type == ONLY_BOXES)
+            {
+                // 当前检测框
+                Box *boxes = boxes_item.Boxes;
+                // 获取上一帧的检测框
+                QueueItem prevItem;
+                memset(&prevItem, 0, sizeof(QueueItem));
+                if (dequeue(args->box_queue, &prevItem) && prevItem.type == ONLY_BOXES)
+                {
+                    Box *prevBoxes = prevItem.Boxes;
+                    for (int i = 0; i < boxes_item.box_count; ++i)
+                    {
+                        // 插值平滑过渡
+                        Box interpolatedBox = InterpolateBox(prevBoxes[i], boxes[i], 0.5f); // 0.5f为插值因子
+                        RenderBox(renderer, &interpolatedBox);
+                    }
+                }
+                else
+                {
+                    // 如果没有前一帧的检测框，直接渲染当前帧的框
+                    for (int i = 0; i < boxes_item.box_count; ++i)
+                    {
+                        RenderBox(renderer, &boxes[i]);
+                    }
+                }
+                // 将当前检测框推入队列，用于下一帧的插值
+                enqueue(args->box_queue, boxes_item);
+            }
+        }
+
+        // 计算FPS并显示
         frameCount++;
         currentFrameTime = SDL_GetPerformanceCounter();
         float elapsedTime = (currentFrameTime - lastFrameTime) / (float)performanceFrequency;
-        sprintf(fpsLabel, "FPS:%.2f", fps);
         if (elapsedTime >= 1.0f)
         {
             fps = frameCount / elapsedTime;
             frameCount = 0;
             lastFrameTime = currentFrameTime;
+            sprintf(fpsLabel, "FPS: %.2f", fps);
         }
+
+        SDL_Color textColor = {255, 0, 0, 255};       // 红色文本
+        SDL_Color backgroundColor = {0, 255, 0, 255}; // 绿色背景
+        SDLDrawLabel(renderer, font, (const char *)fpsLabel, 2, 2, textColor, backgroundColor);
+
+        // 更新屏幕
+        SDL_RenderPresent(renderer);
+
+        Uint32 frameTime = SDL_GetTicks() - frameStart; // 当前帧消耗的时间
+        if (frameTime < FRAME_TIME)
+        {
+            SDL_Delay(FRAME_TIME - frameTime); // 如果当前帧耗时少于目标时间，延迟剩余时间
+        }
+
+        // 事件处理
         while (SDL_PollEvent(&event) != 0)
         {
             if (event.type == SDL_QUIT)
             {
                 goto END;
-            }
-            else if (event.type == SDL_MOUSEMOTION)
-            {
-                rect.x = event.motion.x;
-                rect.y = event.motion.y;
             }
             else if (event.type == SDL_KEYDOWN)
             {
@@ -147,12 +191,9 @@ void *video_renderer_thread(void *arg)
                     goto END;
                 }
             }
-            else if (event.type == SDL_FIRSTEVENT)
-            {
-                fprintf(stderr, "SDL_PollEvent Error: %s\n", SDL_GetError());
-            }
         }
     }
+
 END:
     SDL_DestroyTexture(texture);
     SDL_DestroyRenderer(renderer);
@@ -160,5 +201,6 @@ END:
     TTF_CloseFont(font);
     TTF_Quit();
     SDL_Quit();
+    pthread_exit(NULL);
     return NULL;
 }

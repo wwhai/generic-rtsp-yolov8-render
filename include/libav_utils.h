@@ -22,9 +22,9 @@ extern "C"
 #include <libavcodec/avcodec.h>
 #include <libavutil/imgutils.h>
 #include <libswscale/swscale.h>
-
 #include <SDL2/SDL.h>
 }
+#include "frame_queue.h"
 // 函数用于复制AVFrame
 // 注意：使用完毕后需要释放
 // @param srcFrame 源帧
@@ -35,4 +35,7 @@ AVFrame *CopyAVFrame(AVFrame *srcFrame);
 int CaptureImage(AVFrame *srcFrame, const char *file_path);
 // 录制
 int RecordAVFrameToMP4(const char *output_file, AVFrame *frames[], int num_frames, int width, int height, int fps);
+//
+Box InterpolateBox(Box prevBox, Box currentBox, float t);
+
 #endif

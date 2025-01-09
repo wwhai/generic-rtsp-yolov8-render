@@ -13,10 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef RTSP_HANDLER_H
-#define RTSP_HANDLER_H
-#include "thread_args.h"
+#ifndef THREAD_ARGS
+#define THREAD_ARGS
+#include "frame_queue.h"
+#include "context.h"
 
-void *rtsp_handler_thread(void *arg);
+typedef struct
+{
+    const char *rtsp_url;
+    FrameQueue *video_queue;
+    FrameQueue *detection_queue;
+    FrameQueue *box_queue;
+    Context *ctx;
 
-#endif // RTSP_HANDLER_H
+} ThreadArgs;
+
+#endif

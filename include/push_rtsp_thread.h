@@ -13,10 +13,25 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef RTSP_HANDLER_H
-#define RTSP_HANDLER_H
+#ifndef PUSH_RTSP_H
+#define PUSH_RTSP_H
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <string.h>
+extern "C"
+{
+#include <libavformat/avformat.h>
+#include <libavcodec/avcodec.h>
+#include <libavutil/avutil.h>
+#include <libavutil/imgutils.h>
+#include <libswscale/swscale.h>
+}
 #include "thread_args.h"
 
-void *rtsp_handler_thread(void *arg);
+int OpenOutputAVFormatContext(AVFormatContext **fmt_ctx, const char *rtsp_url);
 
-#endif // RTSP_HANDLER_H
+int OpenAVCodecContext(AVFormatContext *fmt_ctx, AVCodecContext **codec_ctx);
+
+int PushFrameToRTSPServer(AVFormatContext *fmt_ctx, AVCodecContext *codec_ctx, AVFrame *frame);
+#endif

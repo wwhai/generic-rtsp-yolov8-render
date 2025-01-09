@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include "libav_utils.h"
+#include "frame_queue.h"
 // 函数用于复制AVFrame
 AVFrame *CopyAVFrame(AVFrame *srcFrame)
 {
@@ -89,7 +90,9 @@ int CaptureImage(AVFrame *srcFrame, const char *file_path)
     // Open codec
     if ((ret = avcodec_open2(codecCtx, jpegCodec, NULL)) < 0)
     {
-        // fprintf(stderr, "Could not open codec: %s\n", av_err2str(ret));
+        char buffer[64] = {0};
+        char *error = av_make_error_string(buffer, 64, ret);
+        fprintf(stderr, "Could not open codec: %s\n", error);
         goto cleanup;
     }
 
@@ -131,7 +134,9 @@ int CaptureImage(AVFrame *srcFrame, const char *file_path)
     // Send frame to encoder
     if ((ret = avcodec_send_frame(codecCtx, rgbFrame)) < 0)
     {
-        // fprintf(stderr, "Error sending frame to encoder: %s\n", av_err2str(ret));
+        char buffer[64] = {0};
+        char *error = av_make_error_string(buffer, 64, ret);
+        fprintf(stderr, "Error sending frame to encoder: %s\n", error);
         goto cleanup;
     }
 
@@ -139,7 +144,9 @@ int CaptureImage(AVFrame *srcFrame, const char *file_path)
     ret = avcodec_receive_packet(codecCtx, &pkt);
     if (ret < 0)
     {
-        // fprintf(stderr, "Error receiving packet from encoder: %s\n", av_err2str(ret));
+        char buffer[64] = {0};
+        char *error = av_make_error_string(buffer, 64, ret);
+        fprintf(stderr, "Error receiving packet from encoder: %s\n", error);
         goto cleanup;
     }
 
@@ -200,7 +207,9 @@ int RecordAVFrameToMP4(const char *output_file, AVFrame *frames[], int num_frame
     ret = avformat_alloc_output_context2(&format_ctx, NULL, NULL, output_file);
     if (!format_ctx || ret < 0)
     {
-        // fprintf(stderr, "Could not allocate format context: %s\n", av_err2str(ret));
+        char buffer[64] = {0};
+        char *error = av_make_error_string(buffer, 64, ret);
+        fprintf(stderr, "Could not allocate format context: %s\n", error);
         return -1;
     }
 
@@ -252,7 +261,9 @@ int RecordAVFrameToMP4(const char *output_file, AVFrame *frames[], int num_frame
     // Open the codec
     if ((ret = avcodec_open2(codec_ctx, codec, NULL)) < 0)
     {
-        // fprintf(stderr, "Could not open codec: %s\n", av_err2str(ret));
+        char buffer[64] = {0};
+        char *error = av_make_error_string(buffer, 64, ret);
+        fprintf(stderr, "Could not open codec: %s\n", error);
         goto cleanup;
     }
 
@@ -260,7 +271,9 @@ int RecordAVFrameToMP4(const char *output_file, AVFrame *frames[], int num_frame
     ret = avcodec_parameters_from_context(video_stream->codecpar, codec_ctx);
     if (ret < 0)
     {
-        // fprintf(stderr, "Could not copy codec parameters: %s\n", av_err2str(ret));
+        char buffer[64] = {0};
+        char *error = av_make_error_string(buffer, 64, ret);
+        fprintf(stderr, "Could not copy codec parameters: %s\n", error);
         goto cleanup;
     }
 
@@ -269,7 +282,9 @@ int RecordAVFrameToMP4(const char *output_file, AVFrame *frames[], int num_frame
     {
         if ((ret = avio_open(&format_ctx->pb, output_file, AVIO_FLAG_WRITE)) < 0)
         {
-            // fprintf(stderr, "Could not open output file: %s\n", av_err2str(ret));
+            char buffer[64] = {0};
+            char *error = av_make_error_string(buffer, 64, ret);
+            fprintf(stderr, "Could not open output file: %s\n", error);
             goto cleanup;
         }
     }
@@ -277,7 +292,9 @@ int RecordAVFrameToMP4(const char *output_file, AVFrame *frames[], int num_frame
     // Write the header
     if ((ret = avformat_write_header(format_ctx, NULL)) < 0)
     {
-        // fprintf(stderr, "Error writing header: %s\n", av_err2str(ret));
+        char buffer[64] = {0};
+        char *error = av_make_error_string(buffer, 64, ret);
+        fprintf(stderr, "Error writing header: %s\n", error);
         goto cleanup;
     }
 
@@ -290,7 +307,9 @@ int RecordAVFrameToMP4(const char *output_file, AVFrame *frames[], int num_frame
         ret = avcodec_send_frame(codec_ctx, frame);
         if (ret < 0)
         {
-            // fprintf(stderr, "Error sending frame to encoder: %s\n", av_err2str(ret));
+            char buffer[64] = {0};
+            char *error = av_make_error_string(buffer, 64, ret);
+            fprintf(stderr, "Error sending frame to encoder: %s\n", error);
             goto cleanup;
         }
 
@@ -304,7 +323,9 @@ int RecordAVFrameToMP4(const char *output_file, AVFrame *frames[], int num_frame
             }
             else if (ret < 0)
             {
-                // fprintf(stderr, "Error receiving packet from encoder: %s\n", av_err2str(ret));
+                char buffer[64] = {0};
+                char *error = av_make_error_string(buffer, 64, ret);
+                fprintf(stderr, "Error receiving packet from encoder: %s\n", error);
                 goto cleanup;
             }
 
@@ -317,7 +338,9 @@ int RecordAVFrameToMP4(const char *output_file, AVFrame *frames[], int num_frame
             av_packet_unref(&pkt);
             if (ret < 0)
             {
-                // fprintf(stderr, "Error writing packet: %s\n", av_err2str(ret));
+                char buffer[64] = {0};
+                char *error = av_make_error_string(buffer, 64, ret);
+                fprintf(stderr, "Error writing packet: %s\n", error);
                 goto cleanup;
             }
         }
@@ -326,7 +349,9 @@ int RecordAVFrameToMP4(const char *output_file, AVFrame *frames[], int num_frame
     // Write trailer
     if ((ret = av_write_trailer(format_ctx)) < 0)
     {
-        // fprintf(stderr, "Error writing trailer: %s\n", av_err2str(ret));
+        char buffer[64] = {0};
+        char *error = av_make_error_string(buffer, 64, ret);
+        fprintf(stderr, "Error writing trailer: %s\n", error);
     }
 
 cleanup:
@@ -344,4 +369,16 @@ cleanup:
     }
 
     return ret == 0 ? 0 : -1;
+}
+// 简单的线性插值
+Box InterpolateBox(Box prevBox, Box currentBox, float t)
+{
+    Box result;
+    result.x = (1 - t) * prevBox.x + t * currentBox.x;
+    result.y = (1 - t) * prevBox.y + t * currentBox.y;
+    result.w = (1 - t) * prevBox.w + t * currentBox.w;
+    result.h = (1 - t) * prevBox.h + t * currentBox.h;
+    result.prop = (1 - t) * prevBox.prop + t * currentBox.prop;
+    strcpy(result.label, currentBox.label);
+    return result;
 }

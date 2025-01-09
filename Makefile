@@ -1,5 +1,5 @@
 # Compiler and flags
-CC = gcc
+CC = g++
 CFLAGS = -Wall -O2 -I$(INCDIR) `pkg-config --cflags libavformat libavcodec libavutil libswscale sdl2 SDL2_ttf`
 LDFLAGS = `pkg-config --libs libavformat libavcodec libavutil libswscale sdl2 SDL2_ttf` -lpthread
 
