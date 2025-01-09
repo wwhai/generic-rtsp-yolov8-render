@@ -24,6 +24,10 @@ void frame_queue_init(FrameQueue *q, int max_size)
     q->max_size = max_size;
 }
 // 入队操作
+// @param q 队列指针
+// @param item 入队元素
+// @return 1 成功，0 失败
+
 int enqueue(FrameQueue *q, QueueItem item)
 {
     pthread_mutex_lock(&q->lock);
@@ -70,6 +74,9 @@ int enqueue(FrameQueue *q, QueueItem item)
 }
 
 // 出队操作
+// @param q 队列指针
+// @param item 出队元素
+// @return 1 成功，0 失败
 int dequeue(FrameQueue *q, QueueItem *item)
 {
     pthread_mutex_lock(&q->lock);

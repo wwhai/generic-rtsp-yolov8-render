@@ -1,7 +1,7 @@
 # Compiler and flags
 CC = gcc
-CFLAGS = -Wall -O2 -Iinclude `pkg-config --cflags libavformat libavcodec libavutil libswscale sdl2`
-LDFLAGS = `pkg-config --libs libavformat libavcodec libavutil libswscale sdl2` -lpthread
+CFLAGS = -Wall -O2 -I$(INCDIR) `pkg-config --cflags libavformat libavcodec libavutil libswscale sdl2 SDL2_ttf`
+LDFLAGS = `pkg-config --libs libavformat libavcodec libavutil libswscale sdl2 SDL2_ttf` -lpthread
 
 # Target executable
 TARGET = generic-rtsp-yolov8-render

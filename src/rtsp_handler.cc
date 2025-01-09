@@ -21,6 +21,7 @@ extern "C"
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
 #include <libavutil/time.h>
+#include <libavutil/pixdesc.h>
 }
 #include "frame_queue.h"
 #include "rtsp_handler.h"
@@ -68,10 +69,10 @@ void *rtsp_handler_thread(void *arg)
     av_dump_format(fmt_ctx, 0, args->rtsp_url, 0);
 
     // Allocate AVPacket for reading frames
-    AVPacket *packet = av_packet_alloc();
-    if (!packet)
+    AVPacket *origin_packet = av_packet_alloc();
+    if (!origin_packet)
     {
-        fprintf(stderr, "Error: Could not allocate packet.\n");
+        fprintf(stderr, "Error: Could not allocate origin_packet.\n");
         avformat_close_input(&fmt_ctx);
         pthread_exit(NULL);
     }
@@ -84,7 +85,7 @@ void *rtsp_handler_thread(void *arg)
     {
         fprintf(stderr, "Error: Failed to find decoder for codec ID %d.\n", codecpar->codec_id);
         avformat_close_input(&fmt_ctx);
-        av_packet_free(&packet);
+        av_packet_free(&origin_packet);
         pthread_exit(NULL);
     }
 
@@ -94,7 +95,7 @@ void *rtsp_handler_thread(void *arg)
     {
         fprintf(stderr, "Error: Failed to allocate codec context.\n");
         avformat_close_input(&fmt_ctx);
-        av_packet_free(&packet);
+        av_packet_free(&origin_packet);
         pthread_exit(NULL);
     }
 
@@ -106,7 +107,7 @@ void *rtsp_handler_thread(void *arg)
         fprintf(stderr, "Error: Failed to copy codec parameters to codec context (%s).\n", err_str);
         avcodec_free_context(&codec_ctx);
         avformat_close_input(&fmt_ctx);
-        av_packet_free(&packet);
+        av_packet_free(&origin_packet);
         pthread_exit(NULL);
     }
 
@@ -118,46 +119,55 @@ void *rtsp_handler_thread(void *arg)
         fprintf(stderr, "Error: Failed to open codec (%s).\n", err_str);
         avcodec_free_context(&codec_ctx);
         avformat_close_input(&fmt_ctx);
-        av_packet_free(&packet);
+        av_packet_free(&origin_packet);
         pthread_exit(NULL);
     }
-
+    // 输出详细信息
+    for (unsigned int i = 0; i < fmt_ctx->nb_streams; i++)
+    {
+        AVStream *stream = fmt_ctx->streams[i];
+        char pix_fmt_str[16];
+        av_get_pix_fmt_string(pix_fmt_str, sizeof(pix_fmt_str), (AVPixelFormat)stream->codecpar->format);
+        printf("Stream %d:\n", i);
+        printf("  pixel_format: %s\n", pix_fmt_str);
+        printf("  codec_type: %s\n", av_get_media_type_string(stream->codecpar->codec_type));
+        printf("  codec_name: %s\n", avcodec_get_name(stream->codecpar->codec_id));
+    }
     printf("RTSP handler thread started. Listening to stream: %s\n", args->rtsp_url);
 
     // Read frames from the stream
-    while (av_read_frame(fmt_ctx, packet) >= 0)
+    while (av_read_frame(fmt_ctx, origin_packet) >= 0)
     {
-        if (packet->stream_index == video_stream_index)
+        if (origin_packet->stream_index == video_stream_index)
         {
             // Send the packet to the decoder
-            ret = avcodec_send_packet(codec_ctx, packet);
+            ret = avcodec_send_packet(codec_ctx, origin_packet);
             if (ret < 0)
             {
                 char err_str[AV_ERROR_MAX_STRING_SIZE];
                 av_make_error_string(err_str, AV_ERROR_MAX_STRING_SIZE, ret);
                 fprintf(stderr, "Error: Failed to send packet to decoder (%s).\n", err_str);
                 // Free the packet for the next read
-                av_packet_unref(packet);
+                av_packet_unref(origin_packet);
                 continue;
             }
 
-            AVFrame *frame = av_frame_alloc();
-            if (!frame)
+            AVFrame *origin_frame = av_frame_alloc();
+            if (!origin_frame)
             {
                 fprintf(stderr, "Error: Failed to allocate frame.\n");
                 // Free the packet for the next read
-                av_packet_unref(packet);
+                av_packet_unref(origin_packet);
                 continue;
             }
 
             // Receive the decoded frame from the decoder
-            ret = avcodec_receive_frame(codec_ctx, frame);
+            ret = avcodec_receive_frame(codec_ctx, origin_frame);
             if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
             {
                 printf("No frame received from decoder.\n");
-                av_frame_free(&frame);
-                // Free the packet for the next read
-                av_packet_unref(packet);
+                av_frame_free(&origin_frame);
+                av_packet_unref(origin_packet);
                 continue;
             }
             else if (ret < 0)
@@ -165,40 +175,32 @@ void *rtsp_handler_thread(void *arg)
                 char err_str[AV_ERROR_MAX_STRING_SIZE];
                 av_make_error_string(err_str, AV_ERROR_MAX_STRING_SIZE, ret);
                 fprintf(stderr, "Error: Failed to receive frame from decoder (%s).\n", err_str);
-                av_frame_free(&frame);
-                // Free the packet for the next read
-                av_packet_unref(packet);
+                av_frame_free(&origin_frame);
+                av_packet_unref(origin_packet);
                 continue;
             }
             else
             {
-                printf("Frame received from decoder.\n");
-                printf("Frame size1: %d\n", frame->linesize[0]);
-                printf("Frame size2: %d\n", frame->linesize[1]);
-                printf("Frame size3: %d\n", frame->linesize[2]);
+                AVFrame *frameOutput = CopyAVFrame(origin_frame);
+                QueueItem outputItem;
+                outputItem.type = ONLY_FRAME;
+                outputItem.data = frameOutput;
+                memset(outputItem.Boxes, 0, sizeof(outputItem.Boxes));
+                if (!enqueue(args->video_queue, outputItem))
+                {
+                    av_frame_free(&frameOutput);
+                }
             }
-
-            // Copy一份展示
-            AVFrame *frameOutput = CopyAVFrame(frame);
-            QueueItem outputItem;
-            outputItem.type = ONLY_FRAME;
-            outputItem.data = frameOutput;
-            memset(outputItem.Boxes, 0, sizeof(outputItem.Boxes));
-            if (enqueue(args->video_queue, outputItem) == 0)
-            {
-                av_frame_free(&frameOutput);
-            }
-            av_frame_free(&frame);
+            av_frame_free(&origin_frame);
         }
-        av_packet_unref(packet);
+        av_packet_unref(origin_packet);
     }
 
     // Cleanup
     printf("RTSP handler thread finished.\n");
     avcodec_free_context(&codec_ctx);
-    av_packet_free(&packet);
+    av_packet_free(&origin_packet);
     avformat_close_input(&fmt_ctx);
     avformat_network_deinit();
-
     pthread_exit(NULL);
 }
