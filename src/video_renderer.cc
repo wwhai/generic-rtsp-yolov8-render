@@ -15,8 +15,10 @@
 
 #include "video_renderer.h"
 #include "frame_queue.h"
+extern "C"
+{
 #include <SDL2/SDL.h>
-
+}
 void *video_renderer_thread(void *arg)
 {
     FrameQueue *video_queue = (FrameQueue *)arg;
