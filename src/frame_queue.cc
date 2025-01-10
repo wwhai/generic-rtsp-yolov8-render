@@ -96,7 +96,30 @@ int dequeue(FrameQueue *q, QueueItem *item)
     free(temp);
     return 1;
 }
-
+// 出队操作
+// @param q 队列指针
+// @param item 出队元素
+// @return 1 成功，-1 队列为空，0 失败
+int async_dequeue(FrameQueue *q, QueueItem *item)
+{
+    pthread_mutex_lock(&q->lock);
+    if (q->front == NULL)
+    {
+        pthread_mutex_unlock(&q->lock);
+        return -1;
+    }
+    QueueNode *temp = q->front;
+    *item = temp->item;
+    q->front = q->front->next;
+    if (q->front == NULL)
+    {
+        q->rear = NULL;
+    }
+    q->size--; // 减少元素数量
+    pthread_mutex_unlock(&q->lock);
+    free(temp);
+    return 1;
+}
 // 释放队列资源的函数
 void frame_queue_destroy(FrameQueue *q)
 {

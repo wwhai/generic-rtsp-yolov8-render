@@ -185,14 +185,27 @@ void *rtsp_handler_thread(void *arg)
             }
             else
             {
-                AVFrame *frameOutput = CopyAVFrame(origin_frame);
-                QueueItem outputItem;
-                outputItem.type = ONLY_FRAME;
-                outputItem.data = frameOutput;
-                memset(outputItem.Boxes, 0, sizeof(outputItem.Boxes));
-                if (!enqueue(args->video_queue, outputItem))
                 {
-                    av_frame_free(&frameOutput);
+                    AVFrame *display_frame = CopyAVFrame(origin_frame);
+                    QueueItem outputItem;
+                    outputItem.type = ONLY_FRAME;
+                    outputItem.data = display_frame;
+                    memset(outputItem.Boxes, 0, sizeof(outputItem.Boxes));
+                    if (!enqueue(args->video_queue, outputItem))
+                    {
+                        av_frame_free(&display_frame);
+                    }
+                }
+                {
+                    AVFrame *detection_frame = CopyAVFrame(origin_frame);
+                    QueueItem outputItem;
+                    outputItem.type = ONLY_FRAME;
+                    outputItem.data = detection_frame;
+                    memset(outputItem.Boxes, 0, sizeof(outputItem.Boxes));
+                    if (!enqueue(args->detection_queue, outputItem))
+                    {
+                        av_frame_free(&detection_frame);
+                    }
                 }
             }
             av_frame_free(&origin_frame);

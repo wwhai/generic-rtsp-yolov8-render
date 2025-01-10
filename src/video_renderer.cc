@@ -114,44 +114,20 @@ void *video_renderer_thread(void *arg)
                 av_frame_free(&newFrame);
             }
         }
-
         SDL_RenderCopy(renderer, texture, NULL, NULL);
-
         // 处理检测结果队列
         QueueItem boxes_item;
-        if (dequeue(args->box_queue, &boxes_item))
+        if (async_dequeue(args->box_queue, &boxes_item))
         {
-            // printf("<<< dequeue(args->box_queue, &boxes_item)\n");
             if (boxes_item.type == ONLY_BOXES)
             {
-                // 当前检测框
-                Box *boxes = boxes_item.Boxes;
-                // 获取上一帧的检测框
-                QueueItem prevItem;
-                memset(&prevItem, 0, sizeof(QueueItem));
-                if (dequeue(args->box_queue, &prevItem) && prevItem.type == ONLY_BOXES)
+                for (int i = 0; i < boxes_item.box_count; ++i)
                 {
-                    Box *prevBoxes = prevItem.Boxes;
-                    for (int i = 0; i < boxes_item.box_count; ++i)
-                    {
-                        // 插值平滑过渡
-                        Box interpolatedBox = InterpolateBox(prevBoxes[i], boxes[i], 0.5f); // 0.5f为插值因子
-                        RenderBox(renderer, &interpolatedBox);
-                    }
+                    RenderBox(renderer, &boxes_item.Boxes[i]);
+                    SDLDrawText(renderer, texture, font, boxes_item.Boxes[i].label, boxes_item.Boxes[i].x, boxes_item.Boxes[i].y);
                 }
-                else
-                {
-                    // 如果没有前一帧的检测框，直接渲染当前帧的框
-                    for (int i = 0; i < boxes_item.box_count; ++i)
-                    {
-                        RenderBox(renderer, &boxes[i]);
-                    }
-                }
-                // 将当前检测框推入队列，用于下一帧的插值
-                enqueue(args->box_queue, boxes_item);
             }
         }
-
         // 计算FPS并显示
         frameCount++;
         currentFrameTime = SDL_GetPerformanceCounter();

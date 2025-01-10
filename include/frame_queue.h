@@ -65,16 +65,27 @@ typedef struct FrameQueue
     int max_size;
 } FrameQueue;
 
-// 初始化队列
+/// @brief 初始化队列
+/// @param q 队列指针
+/// @param max_size 队列最大容量
 void frame_queue_init(FrameQueue *q, int max_size);
 
-// 入队操作
+/// @brief  入队操作
+/// @param q
+/// @param item
+/// @return
 int enqueue(FrameQueue *q, QueueItem item);
 
 // 出队操作
 int dequeue(FrameQueue *q, QueueItem *item);
-
-// 释放队列资源的函数
+// 出队操作
+// @param q 队列指针
+// @param item 出队元素
+// @return 1 成功，-1 队列为空，0 失败
+int async_dequeue(FrameQueue *q, QueueItem *item);
+/// 销毁队列
+/// @param q 队列指针
+/// @return 0 成功，-1 失败
 void frame_queue_destroy(FrameQueue *q);
 
 #endif // FRAME_QUEUE_H

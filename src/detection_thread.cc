@@ -12,20 +12,26 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
 #include "detection_thread.h"
 #include <stdio.h>
 #include "thread_args.h"
-
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
+#include "opencv_dnn_module.h"
+#include "opencv_utils.h"
 
 void *frame_detection_thread(void *arg)
 {
     const ThreadArgs *args = (ThreadArgs *)arg;
-
-    srand(time(NULL)); // 用于生成随机数的种子
+    const char *modelPath = "./yolov8n.onnx";
+    cv::dnn::Net net;
+    if (Init_CV_ONNX_DNN_Yolov8(modelPath, &net) != 0)
+    {
+        printf("Error: Failed to initialize the YOLOv8 ONNX DNN model.\n");
+        pthread_exit(NULL);
+        return NULL;
+    }
 
     while (1)
     {
@@ -34,37 +40,42 @@ void *frame_detection_thread(void *arg)
             goto END;
         }
 
-        // 每隔 100 毫秒插入一些矩形框
-        usleep(100000); // 100 毫秒
-
-        // 随机生成矩形框
-        QueueItem item;
-        memset(&item, 0, sizeof(QueueItem));
-
-        // 设置框的数量，可以根据需要调整
-        item.box_count = rand() % 5 + 1; // 随机生成 1 到 5 个矩形框
-
-        for (int i = 0; i < item.box_count; ++i)
+        QueueItem detection_item;
+        memset(&detection_item, 0, sizeof(QueueItem));
+        if (dequeue(args->detection_queue, &detection_item))
         {
-            Box *box = &item.Boxes[i];
-
-            // 随机生成矩形框的坐标和大小，范围在 1920x1080 分辨率内
-            box->x = rand() % 1920;                     // 随机横坐标
-            box->y = rand() % 1080;                     // 随机纵坐标
-            box->w = rand() % (1920 - box->x);          // 随机宽度
-            box->h = rand() % (1080 - box->y);          // 随机高度
-            box->prop = (float)(rand() % 100) / 100.0f; // 随机比例
-
-            // 随机生成标签
-            sprintf(box->label, "Box%d", i + 1);
+            if (detection_item.type == ONLY_FRAME)
+            {
+                AVFrame *detection_frame = (AVFrame *)detection_item.data;
+                cv::Mat detection_mat = AVFrameToCVMat(detection_frame);
+                if (!detection_mat.empty())
+                {
+                    std::vector<Box> outputs;
+                    Infer_CV_ONNX_DNN_Yolov8(&net, detection_mat, outputs);
+                    QueueItem boxes_item;
+                    memset(&boxes_item, 0, sizeof(QueueItem));
+                    boxes_item.box_count = (outputs.size() > 20) ? 20 : outputs.size();
+                    boxes_item.type = ONLY_BOXES;
+                    boxes_item.data = NULL;
+                    for (int i = 0; i < boxes_item.box_count; ++i)
+                    {
+                        // 存储检测框信息
+                        boxes_item.Boxes[i].x = outputs[i].x;
+                        boxes_item.Boxes[i].y = outputs[i].y;
+                        boxes_item.Boxes[i].w = outputs[i].w;
+                        boxes_item.Boxes[i].h = outputs[i].h;
+                        boxes_item.Boxes[i].prop = outputs[i].prop;
+                        strcpy(boxes_item.Boxes[i].label, outputs[i].label);
+                    }
+                    enqueue(args->box_queue, boxes_item);
+                }
+                av_frame_free(&detection_frame);
+            }
         }
-        item.type = ONLY_BOXES;
-        item.data = NULL;
-        enqueue(args->box_queue, item);
-        // printf(">>> enqueue(args->detection_queue, item)\n");
     }
 
 END:
+    Release_CV_ONNX_DNN_Yolov8(&net);
     pthread_exit(NULL);
     return NULL;
 }
