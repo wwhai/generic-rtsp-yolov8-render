@@ -88,16 +88,7 @@ void SDLDisplayNV12Frame(SDL_Renderer *renderer, SDL_Texture *texture, AVFrame *
     SDL_RenderCopy(renderer, texture, NULL, NULL);
     free(rgb_buffer);
 }
-// 绘制矩形
-// @param renderer 渲染器
-// @param texture 纹理
-// @param rect 矩形
-void SDLDrawRect(SDL_Renderer *renderer, SDL_Texture *texture, SDL_Rect *rect)
-{
-    SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
-    SDL_RenderDrawRect(renderer, rect);
-    SDL_RenderPresent(renderer);
-}
+
 // 绘制文本
 // @param renderer 渲染器
 // @param texture 纹理
@@ -187,13 +178,13 @@ void SDLDrawBox(SDL_Renderer *renderer, TTF_Font *font, const char *text,
     // Render text above the rectangle
     if (text != NULL)
     {
-        SDL_Color textColor = {255, 0, 0, 0}; // White color
+        SDL_Color textColor = {255, 0, 0, 0};
         SDL_Surface *textSurface = TTF_RenderText_Solid(font, text, textColor);
         SDL_Texture *textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
 
         SDL_Rect textRect;
         textRect.x = x;
-        textRect.y = y - textSurface->h; // Position text above the rectangle
+        textRect.y = y - 24;
         textRect.w = textSurface->w;
         textRect.h = textSurface->h;
 

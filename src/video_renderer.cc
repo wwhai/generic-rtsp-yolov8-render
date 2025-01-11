@@ -60,10 +60,10 @@ void *video_renderer_thread(void *arg)
         SDL_DestroyRenderer(renderer);
         SDL_DestroyWindow(window);
         SDL_Quit();
-        return NULL;
+        pthread_exit(NULL);
     }
     // 加载字体
-    TTF_Font *font = TTF_OpenFont("SourceHanMonoSC-Light.ttf", 24);
+    TTF_Font *font = TTF_OpenFont("SourceHanMonoSC-Light.ttf", 18);
     if (font == NULL)
     {
         fprintf(stderr, "Failed to load font! TTF_Error: %s\n", TTF_GetError());
@@ -123,8 +123,9 @@ void *video_renderer_thread(void *arg)
             {
                 for (int i = 0; i < boxes_item.box_count; ++i)
                 {
-                    RenderBox(renderer, &boxes_item.Boxes[i]);
-                    SDLDrawText(renderer, texture, font, boxes_item.Boxes[i].label, boxes_item.Boxes[i].x, boxes_item.Boxes[i].y);
+                    SDLDrawBox(renderer, font, boxes_item.Boxes[i].label,
+                               boxes_item.Boxes[i].x, boxes_item.Boxes[i].y,
+                               boxes_item.Boxes[i].w, boxes_item.Boxes[i].h, 1);
                 }
             }
         }

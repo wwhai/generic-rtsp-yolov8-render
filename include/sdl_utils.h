@@ -43,12 +43,6 @@ void SDLDisplayNV12Frame(SDL_Renderer *renderer, SDL_Texture *texture, AVFrame *
 /// @brief
 /// @param renderer
 /// @param texture
-/// @param rect
-void SDLDrawRect(SDL_Renderer *renderer, SDL_Texture *texture, SDL_Rect *rect);
-
-/// @brief
-/// @param renderer
-/// @param texture
 /// @param font
 /// @param text
 /// @param x
