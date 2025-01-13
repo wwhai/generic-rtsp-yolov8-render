@@ -1,46 +1,15 @@
 ### 仓库介绍
 
-从 RTSP 流拉取视频并渲染到图形界面，同时对每一帧进行图像处理。
-
-### 功能特性
-
-1. **RTSP 拉流**：通过提供 RTSP URL，从流媒体服务器拉取视频流。
-2. **多线程处理**：
-   - 线程 A：负责实时播放原始视频帧。
-   - 线程 B：负责对视频帧进行图像识别处理。
-3. **动态叠加检测框**：在播放器界面上实时绘制检测出的矩形框及标记文本：
-   - 矩形框为红色，标记文本为绿色。
-4. **硬件加速支持**：SDL2 硬件加速提升渲染性能。
-
-### 项目结构
-
-```
-.
-├── include/              # 头文件目录
-│   ├── frame_queue.h      # 帧队列相关接口
-│   ├── video_renderer.h   # 视频渲染接口
-│   ├── video_processor.h  # 视频处理接口
-│   ├── rtsp_client.h      # RTSP 拉流接口
-├── src/                  # 源代码目录
-│   ├── frame_queue.c      # 帧队列实现
-│   ├── video_renderer.c   # 视频渲染实现
-│   ├── video_processor.c  # 视频处理实现
-│   ├── rtsp_client.c      # RTSP 拉流实现
-│   ├── main.c             # 主程序入口
-├── obj/                  # 中间文件存放目录
-├── Makefile              # 构建脚本
-├── README.md             # 项目说明文档
-```
+从 RTSP 流拉取视频并渲染到图形界面，同时对每一帧进行YOLOV8推理，最后融合到视频输出。
+![P1](image/readme/1736772995737.png)
 
 ### 环境要求
 
 - **开发语言**：C
 - **依赖库**：
-  - libavformat
-  - libavcodec
-  - libavutil
-  - libswscale
-  - SDL2
+      - ffmpeg/n7.1
+      - sdl2/2.30.11
+      - opencv/4.11.0
 - **系统环境**：支持 Linux、Windows 等平台
 
 ### 编译与运行
@@ -55,8 +24,6 @@ make
 
 #### 清理文件
 
-删除生成的中间文件和可执行文件：
-
 ```bash
 make clean
 ```
@@ -64,24 +31,6 @@ make clean
 #### 运行程序
 
 编译成功后，运行以下命令启动程序：
-
 ```bash
-./rtsp_monitor <RTSP_URL>
+./generic-rtsp-yolov8-render.exe rtsp://192.168.10.8:554/av0_0
 ```
-
-示例：
-
-```bash
-./rtsp_monitor rtsp://192.168.1.10:554/live
-```
-
-### 核心模块说明
-
-1. **RTSP 拉流模块 (`rtsp_client.c`)**
-   负责通过 RTSP URL 拉取视频流，解析为帧并推送到帧队列。
-
-2. **视频渲染模块 (`video_renderer.c`)**
-   负责从队列中读取原始视频帧，并通过 SDL2 硬件加速渲染到图形界面。
-
-3. **视频处理模块 (`video_processor.c`)**
-   负责对帧进行识别处理（具体识别逻辑由用户实现），并生成矩形框及标记信息。

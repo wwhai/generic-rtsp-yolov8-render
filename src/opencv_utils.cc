@@ -128,18 +128,46 @@ void rescale_box(float x, float y, float w, float h, float width_scale, float he
     *h_original = h * height_scale;
 }
 
+#include <opencv2/opencv.hpp>
+
 void letterbox(const cv::Mat *src, cv::Mat *dst, int new_width, int new_height, cv::Scalar color)
 {
-    float scale = std::min((float)new_width / src->cols, (float)new_height / src->rows);
-    int unpad_w = scale * src->cols;
-    int unpad_h = scale * src->rows;
+    float scale;
+    int unpad_w, unpad_h;
+    // 宽度大于高度
+    if (new_width > new_height)
+    {
+        scale = (float)new_height / src->rows;
+        unpad_w = scale * src->cols;
+        unpad_h = new_height;
+    }
+    // 高度大于等于宽度
+    else
+    {
+        scale = (float)new_width / src->cols;
+        unpad_w = new_width;
+        unpad_h = scale * src->rows;
+    }
     cv::resize(*src, *dst, cv::Size(unpad_w, unpad_h));
     int pad_w = new_width - unpad_w;
     int pad_h = new_height - unpad_h;
-    int top = pad_h / 2;
-    int bottom = pad_h - top;
-    int left = pad_w / 2;
-    int right = pad_w - left;
+    int top, bottom, left, right;
+    // 宽度大于高度的填充机制
+    if (new_width > new_height)
+    {
+        top = 0;
+        bottom = 0;
+        left = pad_w / 2;
+        right = pad_w - left;
+    }
+    // 高度大于等于宽度的填充机制
+    else
+    {
+        left = 0;
+        right = 0;
+        top = pad_h / 2;
+        bottom = pad_h - top;
+    }
     cv::copyMakeBorder(*dst, *dst, top, bottom, left, right, cv::BORDER_CONSTANT, color);
 }
 
