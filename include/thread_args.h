@@ -24,6 +24,8 @@ typedef struct
     FrameQueue *video_queue;
     FrameQueue *detection_queue;
     FrameQueue *box_queue;
+    FrameQueue *push_origin_rtsp_queue;
+    FrameQueue *push_infer_rtsp_queue;
     Context *ctx;
 
 } ThreadArgs;

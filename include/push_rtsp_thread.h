@@ -28,10 +28,25 @@ extern "C"
 #include <libswscale/swscale.h>
 }
 #include "thread_args.h"
-
+/// @brief 打开AVFormatContext
+/// @param fmt_ctx
+/// @param rtsp_url
+/// @return
 int OpenOutputAVFormatContext(AVFormatContext **fmt_ctx, const char *rtsp_url);
-
+/// @brief 打开AVCodecContext
+/// @param fmt_ctx
+/// @param codec_ctx
+/// @return
 int OpenAVCodecContext(AVFormatContext *fmt_ctx, AVCodecContext **codec_ctx);
-
+/// @brief 推送帧到 RTSP 服务器的函数
+/// @param fmt_ctx
+/// @param codec_ctx
+/// @param frame
+/// @return
 int PushFrameToRTSPServer(AVFormatContext *fmt_ctx, AVCodecContext *codec_ctx, AVFrame *frame);
+
+/// @brief 推送RTSP线程处理函数
+/// @param arg
+/// @return
+void *push_rtsp_handler_thread(void *arg);
 #endif

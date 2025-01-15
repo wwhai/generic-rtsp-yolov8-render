@@ -17,6 +17,6 @@
 #define RTSP_HANDLER_H
 #include "thread_args.h"
 
-void *rtsp_handler_thread(void *arg);
+void *pull_rtsp_handler_thread(void *arg);
 
 #endif // RTSP_HANDLER_H

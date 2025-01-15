@@ -25,20 +25,23 @@
 #include <unistd.h>
 #include "background.h"
 #include "context.h"
+#include "push_rtsp_thread.h"
 /// @brief
 Context *background_thread_ctx;
-Context *rtsp_thread_ctx;
+Context *pull_rtsp_thread_ctx;
 Context *video_renderer_thread_ctx;
 Context *detection_thread_ctx;
+Context *push_rtsp_thread_ctx;
 /// @brief
 /// @param sig
 void handle_signal(int sig)
 {
-    CancelContext(rtsp_thread_ctx);
+    CancelContext(pull_rtsp_thread_ctx);
     CancelContext(video_renderer_thread_ctx);
     CancelContext(detection_thread_ctx);
     CancelContext(background_thread_ctx);
-    fprintf(stderr, "Received signal: %d\n", sig);
+    CancelContext(push_rtsp_thread_ctx);
+    fprintf(stderr, "Received signal %d, exiting...\n", sig);
     exit(0);
 }
 
@@ -56,23 +59,36 @@ int main(int argc, char *argv[])
     }
     const char *rtsp_url = argv[1];
     background_thread_ctx = CreateContext();
-    rtsp_thread_ctx = CreateContext();
+    pull_rtsp_thread_ctx = CreateContext();
     video_renderer_thread_ctx = CreateContext();
     detection_thread_ctx = CreateContext();
+    push_rtsp_thread_ctx = CreateContext();
 
     // Initialize frame queues
-    FrameQueue video_queue, detection_queue, box_queue;
+    FrameQueue video_queue, detection_queue, box_queue, push_origin_rtsp_queue, push_infer_rtsp_queue;
     frame_queue_init(&video_queue, 60);
     frame_queue_init(&detection_queue, 60);
     frame_queue_init(&box_queue, 60);
+    frame_queue_init(&push_origin_rtsp_queue, 60);
+    frame_queue_init(&push_infer_rtsp_queue, 60);
 
     // Create threads
-    pthread_t background_thread, rtsp_thread, renderer_thread, detection_thread;
+    pthread_t background_thread, pull_rtsp_thread, renderer_thread, detection_thread, push_rtsp_thread;
     //
     ThreadArgs background_thread_args = {.ctx = background_thread_ctx};
-    ThreadArgs rtsp_thread_args = {rtsp_url, &video_queue, &detection_queue, &box_queue, rtsp_thread_ctx};
-    ThreadArgs video_renderer_thread_args = {rtsp_url, &video_queue, &detection_queue, &box_queue, video_renderer_thread_ctx};
-    ThreadArgs detection_thread_args = {rtsp_url, &video_queue, &detection_queue, &box_queue, detection_thread_ctx};
+
+    ThreadArgs pull_rtsp_thread_args = {rtsp_url, &video_queue,
+                                        &detection_queue, &box_queue, &push_origin_rtsp_queue,
+                                        &push_infer_rtsp_queue, pull_rtsp_thread_ctx};
+    ThreadArgs video_renderer_thread_args = {rtsp_url, &video_queue,
+                                             &detection_queue, &box_queue, &push_origin_rtsp_queue,
+                                             &push_infer_rtsp_queue, pull_rtsp_thread_ctx};
+    ThreadArgs detection_thread_args = {rtsp_url, &video_queue,
+                                        &detection_queue, &box_queue, &push_origin_rtsp_queue,
+                                        &push_infer_rtsp_queue, pull_rtsp_thread_ctx};
+    ThreadArgs push_rtsp_thread_args = {rtsp_url, &video_queue,
+                                        &detection_queue, &box_queue, &push_origin_rtsp_queue,
+                                        &push_infer_rtsp_queue, pull_rtsp_thread_ctx};
     //
     if (pthread_create(&background_thread, NULL, background_task_thread, (void *)&background_thread_args) != 0)
     {
@@ -80,14 +96,12 @@ int main(int argc, char *argv[])
         goto END;
     }
     //
-
-    if (pthread_create(&rtsp_thread, NULL, rtsp_handler_thread, (void *)&rtsp_thread_args) != 0)
+    if (pthread_create(&pull_rtsp_thread, NULL, pull_rtsp_handler_thread, (void *)&pull_rtsp_thread_args) != 0)
     {
         perror("Failed to create RTSP thread");
         goto END;
     }
     //
-
     if (pthread_create(&renderer_thread, NULL, video_renderer_thread, (void *)&video_renderer_thread_args) != 0)
     {
         perror("Failed to create video renderer thread");
@@ -99,27 +113,37 @@ int main(int argc, char *argv[])
         perror("Failed to create detection thread");
         goto END;
     }
-
-    // Wait for threads to finish
-    printf("waiting for threads to finish\n");
-    pthread_detach(rtsp_thread);
+    //
+    if (pthread_create(&push_rtsp_thread, NULL, push_rtsp_handler_thread, (void *)&push_rtsp_thread_args) != 0)
+    {
+        perror("Failed to create detection thread");
+        goto END;
+    }
+    fprintf(stderr, "Main thread waiting for threads to finish...\n");
+    pthread_detach(pull_rtsp_thread);
     pthread_detach(renderer_thread);
     pthread_detach(detection_thread);
+    pthread_detach(push_rtsp_thread);
     pthread_join(background_thread, NULL);
 END:
     // Cancel contexts
     CancelContext(background_thread_ctx);
-    CancelContext(rtsp_thread_ctx);
+    CancelContext(pull_rtsp_thread_ctx);
     CancelContext(video_renderer_thread_ctx);
     CancelContext(detection_thread_ctx);
+    CancelContext(push_rtsp_thread_ctx);
     // Destroy threads
-    pthread_cond_destroy(&rtsp_thread_ctx->cond);
+    pthread_cond_destroy(&background_thread_ctx->cond);
+    pthread_mutex_destroy(&pull_rtsp_thread_ctx->mtx);
     pthread_mutex_destroy(&video_renderer_thread_ctx->mtx);
     pthread_mutex_destroy(&detection_thread_ctx->mtx);
+    pthread_mutex_destroy(&push_rtsp_thread_ctx->mtx);
     // Free frame queues
     frame_queue_destroy(&video_queue);
     frame_queue_destroy(&box_queue);
     frame_queue_destroy(&detection_queue);
+    frame_queue_destroy(&push_origin_rtsp_queue);
+    frame_queue_destroy(&push_infer_rtsp_queue);
 
     return EXIT_SUCCESS;
 }

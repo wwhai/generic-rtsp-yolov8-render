@@ -27,7 +27,7 @@ extern "C"
 #include "rtsp_handler.h"
 #include "libav_utils.h"
 
-void *rtsp_handler_thread(void *arg)
+void *pull_rtsp_handler_thread(void *arg)
 {
     const ThreadArgs *args = (ThreadArgs *)arg;
     AVFormatContext *fmt_ctx = NULL;
@@ -194,6 +194,17 @@ void *rtsp_handler_thread(void *arg)
                     if (!enqueue(args->video_queue, outputItem))
                     {
                         av_frame_free(&display_frame);
+                    }
+                }
+                {
+                    AVFrame *output_frame = CopyAVFrame(origin_frame);
+                    QueueItem outputItem;
+                    outputItem.type = ONLY_FRAME;
+                    outputItem.data = output_frame;
+                    memset(outputItem.Boxes, 0, sizeof(outputItem.Boxes));
+                    if (!enqueue(args->push_origin_rtsp_queue, outputItem))
+                    {
+                        av_frame_free(&output_frame);
                     }
                 }
                 {
