@@ -133,7 +133,7 @@ void *pull_rtsp_handler_thread(void *arg)
         printf("  codec_type: %s\n", av_get_media_type_string(stream->codecpar->codec_type));
         printf("  codec_name: %s\n", avcodec_get_name(stream->codecpar->codec_id));
     }
-    printf("RTSP handler thread started. Listening to stream: %s\n", args->rtsp_url);
+    fprintf(stderr, "RTSP handler thread started. Pull stream: %s\n", args->rtsp_url);
 
     // Read frames from the stream
     while (av_read_frame(fmt_ctx, origin_packet) >= 0)

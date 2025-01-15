@@ -43,10 +43,10 @@ int OpenAVCodecContext(AVFormatContext *fmt_ctx, AVCodecContext **codec_ctx);
 /// @param codec_ctx
 /// @param frame
 /// @return
-int PushFrameToRTSPServer(AVFormatContext *fmt_ctx, AVCodecContext *codec_ctx, AVFrame *frame);
+int PushFrameToRTMPServer(AVFormatContext *fmt_ctx, AVCodecContext *codec_ctx, AVFrame *frame);
 
 /// @brief 推送RTSP线程处理函数
 /// @param arg
 /// @return
-void *push_rtsp_handler_thread(void *arg);
+void *push_rtmp_handler_thread(void *arg);
 #endif

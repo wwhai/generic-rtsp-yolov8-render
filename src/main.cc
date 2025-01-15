@@ -114,7 +114,7 @@ int main(int argc, char *argv[])
         goto END;
     }
     //
-    if (pthread_create(&push_rtsp_thread, NULL, push_rtsp_handler_thread, (void *)&push_rtsp_thread_args) != 0)
+    if (pthread_create(&push_rtsp_thread, NULL, push_rtmp_handler_thread, (void *)&push_rtsp_thread_args) != 0)
     {
         perror("Failed to create detection thread");
         goto END;
