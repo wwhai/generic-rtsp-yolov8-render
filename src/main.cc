@@ -25,7 +25,7 @@
 #include <unistd.h>
 #include "background.h"
 #include "context.h"
-#include "push_rtsp_thread.h"
+#include "push_stream_thread.h"
 /// @brief
 Context *background_thread_ctx;
 Context *pull_rtsp_thread_ctx;
@@ -65,12 +65,12 @@ int main(int argc, char *argv[])
     push_rtsp_thread_ctx = CreateContext();
 
     // Initialize frame queues
-    FrameQueue video_queue, detection_queue, box_queue, push_origin_rtsp_queue, push_infer_rtsp_queue;
+    FrameQueue video_queue, detection_queue, box_queue, origin_frame_queue, infer_frame_queue;
     frame_queue_init(&video_queue, 60);
     frame_queue_init(&detection_queue, 60);
     frame_queue_init(&box_queue, 60);
-    frame_queue_init(&push_origin_rtsp_queue, 60);
-    frame_queue_init(&push_infer_rtsp_queue, 60);
+    frame_queue_init(&origin_frame_queue, 60);
+    frame_queue_init(&infer_frame_queue, 60);
 
     // Create threads
     pthread_t background_thread, pull_rtsp_thread, renderer_thread, detection_thread, push_rtsp_thread;
@@ -78,17 +78,17 @@ int main(int argc, char *argv[])
     ThreadArgs background_thread_args = {.ctx = background_thread_ctx};
 
     ThreadArgs pull_rtsp_thread_args = {rtsp_url, &video_queue,
-                                        &detection_queue, &box_queue, &push_origin_rtsp_queue,
-                                        &push_infer_rtsp_queue, pull_rtsp_thread_ctx};
+                                        &detection_queue, &box_queue, &origin_frame_queue,
+                                        &infer_frame_queue, pull_rtsp_thread_ctx};
     ThreadArgs video_renderer_thread_args = {rtsp_url, &video_queue,
-                                             &detection_queue, &box_queue, &push_origin_rtsp_queue,
-                                             &push_infer_rtsp_queue, pull_rtsp_thread_ctx};
+                                             &detection_queue, &box_queue, &origin_frame_queue,
+                                             &infer_frame_queue, pull_rtsp_thread_ctx};
     ThreadArgs detection_thread_args = {rtsp_url, &video_queue,
-                                        &detection_queue, &box_queue, &push_origin_rtsp_queue,
-                                        &push_infer_rtsp_queue, pull_rtsp_thread_ctx};
+                                        &detection_queue, &box_queue, &origin_frame_queue,
+                                        &infer_frame_queue, pull_rtsp_thread_ctx};
     ThreadArgs push_rtsp_thread_args = {rtsp_url, &video_queue,
-                                        &detection_queue, &box_queue, &push_origin_rtsp_queue,
-                                        &push_infer_rtsp_queue, pull_rtsp_thread_ctx};
+                                        &detection_queue, &box_queue, &origin_frame_queue,
+                                        &infer_frame_queue, pull_rtsp_thread_ctx};
     //
     if (pthread_create(&background_thread, NULL, background_task_thread, (void *)&background_thread_args) != 0)
     {
@@ -142,8 +142,8 @@ END:
     frame_queue_destroy(&video_queue);
     frame_queue_destroy(&box_queue);
     frame_queue_destroy(&detection_queue);
-    frame_queue_destroy(&push_origin_rtsp_queue);
-    frame_queue_destroy(&push_infer_rtsp_queue);
+    frame_queue_destroy(&origin_frame_queue);
+    frame_queue_destroy(&infer_frame_queue);
 
     return EXIT_SUCCESS;
 }

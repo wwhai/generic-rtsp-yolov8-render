@@ -13,40 +13,34 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef PUSH_RTSP_H
-#define PUSH_RTSP_H
-#include <stdio.h>
-#include <stdlib.h>
-#include <pthread.h>
-#include <string.h>
+#ifndef PUSH_RTMP_H
+#define PUSH_RTMP_H
+
 extern "C"
 {
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
+#include <libavutil/frame.h>
+#include <libavutil/mem.h>
+#include <libavutil/error.h>
 #include <libavutil/avutil.h>
-#include <libavutil/imgutils.h>
-#include <libswscale/swscale.h>
 }
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "frame_queue.h" // 自定义队列头文件
 #include "thread_args.h"
-/// @brief 打开AVFormatContext
-/// @param fmt_ctx
-/// @param rtsp_url
-/// @return
-int OpenOutputAVFormatContext(AVFormatContext **fmt_ctx, const char *rtsp_url);
-/// @brief 打开AVCodecContext
-/// @param fmt_ctx
-/// @param codec_ctx
-/// @return
-int OpenAVCodecContext(AVFormatContext *fmt_ctx, AVCodecContext **codec_ctx);
-/// @brief 推送帧到 RTSP 服务器的函数
-/// @param fmt_ctx
-/// @param codec_ctx
-/// @param frame
-/// @return
-int PushFrameToRTMPServer(AVFormatContext *fmt_ctx, AVCodecContext *codec_ctx, AVFrame *frame);
+// 定义推流的 RTMP 地址
+#define RTMP_URL "rtmp://192.168.10.7:1935/live/tlive001"
 
-/// @brief 推送RTSP线程处理函数
-/// @param arg
-/// @return
+// 初始化 AVFormatContext 和 AVCodecContext
+void init_av_contexts(AVFormatContext **output_ctx, AVCodecContext **codec_ctx, const char *rtmp_url);
+
+// 将 AVFrame 编码为 AVPacket，并推送到 RTMP 服务器
+int push_rtmp_frame(AVCodecContext *codec_ctx, AVFrame *frame, AVPacket *pkt, AVFormatContext *output_ctx);
+
+// 推流线程处理函数
 void *push_rtmp_handler_thread(void *arg);
-#endif
+
+#endif // PUSH_RTMP_H

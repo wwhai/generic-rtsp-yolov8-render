@@ -202,7 +202,7 @@ void *pull_rtsp_handler_thread(void *arg)
                     outputItem.type = ONLY_FRAME;
                     outputItem.data = output_frame;
                     memset(outputItem.Boxes, 0, sizeof(outputItem.Boxes));
-                    if (!enqueue(args->push_origin_rtsp_queue, outputItem))
+                    if (!enqueue(args->origin_frame_queue, outputItem))
                     {
                         av_frame_free(&output_frame);
                     }
