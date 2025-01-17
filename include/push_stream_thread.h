@@ -24,6 +24,8 @@ extern "C"
 #include <libavutil/mem.h>
 #include <libavutil/error.h>
 #include <libavutil/avutil.h>
+#include <libavutil/opt.h>
+#include <libavutil/imgutils.h>
 }
 #include <pthread.h>
 #include <stdio.h>
@@ -31,17 +33,35 @@ extern "C"
 #include <string.h>
 #include "frame_queue.h" // 自定义队列头文件
 #include "thread_args.h"
-// 定义推流的 RTMP 地址
-#define RTMP_URL "rtmp://192.168.10.7:1935/live/tlive001"
+typedef struct
+{
+    AVFormatContext *output_ctx;
+    AVStream *video_stream;
+    AVCodecContext *codec_ctx;
+} RtmpStreamContext;
+// 获取错误字符串的全局缓冲区实现
+const char *get_av_error_string(int errnum)
+{
+    static char error_buffer[AV_ERROR_MAX_STRING_SIZE]; // 静态缓冲区
+    av_strerror(errnum, error_buffer, AV_ERROR_MAX_STRING_SIZE);
+    return error_buffer;
+}
+/// @brief
+/// @param ctx
+/// @param output_url
+/// @param width
+/// @param height
+/// @param fps
+/// @return
+int init_rtmp_stream(RtmpStreamContext *ctx, const char *output_url, int width, int height, int fps);
+/// @brief
+/// @param ctx
+/// @param frame
+void push_stream(RtmpStreamContext *ctx, AVFrame *frame);
 
-// 初始化 AVFormatContext 和 AVCodecContext
-int init_av_contexts(const char *input_url, const char *output_url,
-                     AVFormatContext **input_format_ctx, AVFormatContext **output_format_ctx,
-                     AVCodecContext **input_codec_ctx, AVStream **input_stream, AVStream **output_stream);
-// 将 AVFrame 编码为 AVPacket，并推送到 RTMP 服务器
-int push_rtmp_frame(AVCodecContext *codec_ctx, AVFrame *frame, AVPacket *pkt, AVFormatContext *output_ctx);
-
-// 推流线程处理函数
+/// @brief
+/// @param arg
+/// @return
 void *push_rtmp_handler_thread(void *arg);
 
 #endif // PUSH_RTMP_H
