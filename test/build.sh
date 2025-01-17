@@ -12,5 +12,8 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
+set -e
 
-gcc -Wall -O2 -Iinclude `pkg-config --cflags libavformat libavcodec libavutil libswscale sdl2` ./ffmpeg_streaming.c -o ffmpeg_video_player  `pkg-config --libs libavformat libavcodec libavutil libswscale sdl2` -lpthread
+gcc -Wall -O2 -Iinclude ./ffmpeg_streaming.c -o ffmpeg_streaming -lpthread \
+ `pkg-config --libs libavformat libavcodec libavutil libswscale sdl2 ` \
+ `pkg-config --cflags libavformat libavcodec libavutil libswscale sdl2`

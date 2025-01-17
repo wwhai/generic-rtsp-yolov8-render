@@ -35,8 +35,9 @@ extern "C"
 #define RTMP_URL "rtmp://192.168.10.7:1935/live/tlive001"
 
 // 初始化 AVFormatContext 和 AVCodecContext
-void init_av_contexts(AVFormatContext **output_ctx, AVCodecContext **codec_ctx, const char *rtmp_url);
-
+int init_av_contexts(const char *input_url, const char *output_url,
+                     AVFormatContext **input_format_ctx, AVFormatContext **output_format_ctx,
+                     AVCodecContext **input_codec_ctx, AVStream **input_stream, AVStream **output_stream);
 // 将 AVFrame 编码为 AVPacket，并推送到 RTMP 服务器
 int push_rtmp_frame(AVCodecContext *codec_ctx, AVFrame *frame, AVPacket *pkt, AVFormatContext *output_ctx);
 
