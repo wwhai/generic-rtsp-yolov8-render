@@ -1,4 +1,11 @@
 #include "push_stream_thread.h"
+//
+const char *get_av_error(int errnum)
+{
+    static char error_buffer[AV_ERROR_MAX_STRING_SIZE]; // 静态缓冲区
+    av_strerror(errnum, error_buffer, AV_ERROR_MAX_STRING_SIZE);
+    return error_buffer;
+}
 // 初始化推流上下文
 int init_rtmp_stream(RtmpStreamContext *ctx, const char *output_url, int width, int height, int fps)
 {
