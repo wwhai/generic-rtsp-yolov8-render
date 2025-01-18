@@ -40,7 +40,7 @@ typedef struct
     AVCodecContext *codec_ctx;
 } RtmpStreamContext;
 // 获取错误字符串的全局缓冲区实现
-const char *get_av_error_string(int errnum)
+const char *get_av_error(int errnum)
 {
     static char error_buffer[AV_ERROR_MAX_STRING_SIZE]; // 静态缓冲区
     av_strerror(errnum, error_buffer, AV_ERROR_MAX_STRING_SIZE);

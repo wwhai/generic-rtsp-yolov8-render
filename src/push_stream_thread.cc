@@ -8,7 +8,7 @@ int init_rtmp_stream(RtmpStreamContext *ctx, const char *output_url, int width, 
     ret = avformat_alloc_output_context2(&ctx->output_ctx, NULL, "flv", output_url);
     if (!ctx->output_ctx)
     {
-        fprintf(stderr, "Could not create output context: %s\n", get_av_error_string(ret));
+        fprintf(stderr, "Could not create output context: %s\n", get_av_error(ret));
         return -1;
     }
 
@@ -55,7 +55,7 @@ int init_rtmp_stream(RtmpStreamContext *ctx, const char *output_url, int width, 
     ret = avcodec_open2(ctx->codec_ctx, codec, NULL);
     if (ret < 0)
     {
-        fprintf(stderr, "Could not open codec: %s\n", get_av_error_string(ret));
+        fprintf(stderr, "Could not open codec: %s\n", get_av_error(ret));
         return -1;
     }
 
@@ -63,7 +63,7 @@ int init_rtmp_stream(RtmpStreamContext *ctx, const char *output_url, int width, 
     ret = avcodec_parameters_from_context(ctx->video_stream->codecpar, ctx->codec_ctx);
     if (ret < 0)
     {
-        fprintf(stderr, "Could not copy codec parameters: %s\n", get_av_error_string(ret));
+        fprintf(stderr, "Could not copy codec parameters: %s\n", get_av_error(ret));
         return -1;
     }
 
@@ -73,7 +73,7 @@ int init_rtmp_stream(RtmpStreamContext *ctx, const char *output_url, int width, 
         ret = avio_open(&ctx->output_ctx->pb, output_url, AVIO_FLAG_WRITE);
         if (ret < 0)
         {
-            fprintf(stderr, "Could not open output URL: %s\n", get_av_error_string(ret));
+            fprintf(stderr, "Could not open output URL: %s\n", get_av_error(ret));
             return -1;
         }
     }
@@ -82,7 +82,7 @@ int init_rtmp_stream(RtmpStreamContext *ctx, const char *output_url, int width, 
     ret = avformat_write_header(ctx->output_ctx, NULL);
     if (ret < 0)
     {
-        fprintf(stderr, "Error occurred when writing header: %s\n", get_av_error_string(ret));
+        fprintf(stderr, "Error occurred when writing header: %s\n", get_av_error(ret));
         return -1;
     }
 
@@ -97,7 +97,7 @@ void push_stream(RtmpStreamContext *ctx, AVFrame *frame)
     ret = avcodec_send_frame(ctx->codec_ctx, frame);
     if (ret < 0)
     {
-        fprintf(stderr, "Error sending frame: %s\n", get_av_error_string(ret));
+        fprintf(stderr, "Error sending frame: %s\n", get_av_error(ret));
         return;
     }
 
@@ -112,7 +112,7 @@ void push_stream(RtmpStreamContext *ctx, AVFrame *frame)
             {
                 break;
             }
-            fprintf(stderr, "Error encoding frame: %s\n", get_av_error_string(ret));
+            fprintf(stderr, "Error encoding frame: %s\n", get_av_error(ret));
             break;
         }
 
@@ -124,7 +124,7 @@ void push_stream(RtmpStreamContext *ctx, AVFrame *frame)
         ret = av_interleaved_write_frame(ctx->output_ctx, &pkt);
         if (ret < 0)
         {
-            fprintf(stderr, "Error writing frame: %s\n", get_av_error_string(ret));
+            fprintf(stderr, "Error writing frame: %s\n", get_av_error(ret));
             break;
         }
 
