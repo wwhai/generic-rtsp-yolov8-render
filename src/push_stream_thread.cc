@@ -1,95 +1,106 @@
-#include "push_stream_thread.h"
+// Copyright (C) 2025 wwhai
 //
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as
+// published by the Free Software Foundation, either version 3 of the
+// License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+#include "push_stream_thread.h"
+
 const char *get_av_error(int errnum)
 {
-    static char error_buffer[AV_ERROR_MAX_STRING_SIZE]; // 静态缓冲区
-    av_strerror(errnum, error_buffer, AV_ERROR_MAX_STRING_SIZE);
-    return error_buffer;
+    static char str[AV_ERROR_MAX_STRING_SIZE];
+    av_strerror(errnum, str, sizeof(str));
+    return str;
 }
-// 初始化推流上下文
+
 int init_rtmp_stream(RtmpStreamContext *ctx, const char *output_url, int width, int height, int fps)
 {
-    int ret = 0;
-
     // 创建输出上下文
-    ret = avformat_alloc_output_context2(&ctx->output_ctx, NULL, "flv", output_url);
-    if (!ctx->output_ctx)
+    int ret = avformat_alloc_output_context2(&ctx->output_ctx, NULL, "flv", output_url);
+    if (ret < 0 || !ctx->output_ctx)
     {
-        fprintf(stderr, "Could not create output context: %s\n", get_av_error(ret));
+        fprintf(stderr, "Failed to create output context: %s\n", get_av_error(ret));
         return -1;
     }
 
     // 查找编码器
-
     const AVCodec *codec = avcodec_find_encoder(AV_CODEC_ID_H264);
     if (!codec)
     {
-        fprintf(stderr, "Codec not found\n");
+        fprintf(stderr, "H.264 encoder not found\n");
         return -1;
     }
 
-    // 创建新的视频流
-    ctx->video_stream = avformat_new_stream(ctx->output_ctx, NULL);
-    if (!ctx->video_stream)
-    {
-        fprintf(stderr, "Could not create video stream\n");
-        return -1;
-    }
-
-    // 初始化编码器上下文
+    // 创建编码器上下文
     ctx->codec_ctx = avcodec_alloc_context3(codec);
     if (!ctx->codec_ctx)
     {
-        fprintf(stderr, "Could not allocate codec context\n");
+        fprintf(stderr, "Failed to allocate codec context\n");
         return -1;
     }
 
-    ctx->codec_ctx->codec_id = codec->id;
-    ctx->codec_ctx->codec_type = AVMEDIA_TYPE_VIDEO;
+    // 配置编码参数
     ctx->codec_ctx->width = width;
     ctx->codec_ctx->height = height;
+    ctx->codec_ctx->pix_fmt = AV_PIX_FMT_NV12;
     ctx->codec_ctx->time_base = (AVRational){1, fps};
     ctx->codec_ctx->framerate = (AVRational){fps, 1};
-    ctx->codec_ctx->gop_size = 10; // 每组图像的大小
-    ctx->codec_ctx->pix_fmt = AV_PIX_FMT_YUV420P;
+    ctx->codec_ctx->bit_rate = 4000000;
+    ctx->codec_ctx->gop_size = 12;
 
-    if (ctx->output_ctx->oformat->flags & AVFMT_GLOBALHEADER)
+    // H.264高级配置
+    av_opt_set(ctx->codec_ctx->priv_data, "preset", "fast", 0);
+    av_opt_set(ctx->codec_ctx->priv_data, "tune", "zerolatency", 0);
+
+    // 创建输出流
+    ctx->video_stream = avformat_new_stream(ctx->output_ctx, NULL);
+    if (!ctx->video_stream)
     {
-        ctx->codec_ctx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
+        fprintf(stderr, "Failed to create video stream\n");
+        return -1;
+    }
+
+    // 关联编码器参数到流
+    ret = avcodec_parameters_from_context(ctx->video_stream->codecpar, ctx->codec_ctx);
+    if (ret < 0)
+    {
+        fprintf(stderr, "Failed to copy codec parameters: %s\n", get_av_error(ret));
+        return -1;
     }
 
     // 打开编码器
     ret = avcodec_open2(ctx->codec_ctx, codec, NULL);
     if (ret < 0)
     {
-        fprintf(stderr, "Could not open codec: %s\n", get_av_error(ret));
+        fprintf(stderr, "Failed to open codec: %s\n", get_av_error(ret));
         return -1;
     }
 
-    // 将编码器参数复制到视频流
-    ret = avcodec_parameters_from_context(ctx->video_stream->codecpar, ctx->codec_ctx);
-    if (ret < 0)
-    {
-        fprintf(stderr, "Could not copy codec parameters: %s\n", get_av_error(ret));
-        return -1;
-    }
-
-    // 打开输出文件
-    if (!(ctx->output_ctx->flags & AVFMT_NOFILE))
+    // 打开网络输出
+    if (!(ctx->output_ctx->oformat->flags & AVFMT_NOFILE))
     {
         ret = avio_open(&ctx->output_ctx->pb, output_url, AVIO_FLAG_WRITE);
         if (ret < 0)
         {
-            fprintf(stderr, "Could not open output URL: %s\n", get_av_error(ret));
+            fprintf(stderr, "Failed to open output URL: %s\n", get_av_error(ret));
             return -1;
         }
     }
 
-    // 写入流头信息
+    // 写入文件头
     ret = avformat_write_header(ctx->output_ctx, NULL);
     if (ret < 0)
     {
-        fprintf(stderr, "Error occurred when writing header: %s\n", get_av_error(ret));
+        fprintf(stderr, "Failed to write header: %s\n", get_av_error(ret));
         return -1;
     }
 
@@ -98,41 +109,38 @@ int init_rtmp_stream(RtmpStreamContext *ctx, const char *output_url, int width, 
 
 void push_stream(RtmpStreamContext *ctx, AVFrame *frame)
 {
-    int ret;
-
     // 发送帧到编码器
-    ret = avcodec_send_frame(ctx->codec_ctx, frame);
+    int ret = avcodec_send_frame(ctx->codec_ctx, frame);
     if (ret < 0)
     {
         fprintf(stderr, "Error sending frame: %s\n", get_av_error(ret));
         return;
     }
 
-    // 获取编码后的数据包
-    AVPacket pkt = {0};
+    AVPacket pkt;
+
+    // 接收编码后的数据包
     while (ret >= 0)
     {
         ret = avcodec_receive_packet(ctx->codec_ctx, &pkt);
+        if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
+            break;
+
         if (ret < 0)
         {
-            if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
-            {
-                break;
-            }
             fprintf(stderr, "Error encoding frame: %s\n", get_av_error(ret));
             break;
         }
 
-        // 设置数据包流索引
+        // 设置数据包属性
         pkt.stream_index = ctx->video_stream->index;
         av_packet_rescale_ts(&pkt, ctx->codec_ctx->time_base, ctx->video_stream->time_base);
 
-        // 写入数据包到输出流
+        // 发送数据包
         ret = av_interleaved_write_frame(ctx->output_ctx, &pkt);
         if (ret < 0)
         {
-            fprintf(stderr, "Error writing frame: %s\n", get_av_error(ret));
-            break;
+            fprintf(stderr, "Error writing packet: %s\n", get_av_error(ret));
         }
 
         av_packet_unref(&pkt);
