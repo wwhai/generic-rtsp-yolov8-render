@@ -85,7 +85,7 @@ int main()
     }
 
     // 打开输出RTMP
-    ret = avformat_alloc_output_context2(&output_format_ctx, NULL, "flv", "rtmp://192.168.10.7:1935/live/tlive001");
+    ret = avformat_alloc_output_context2(&output_format_ctx, NULL, "flv", "rtmp://192.168.10.5:1935/live/tlive001");
     if (ret < 0)
     {
         fprintf(stderr, "无法创建输出上下文\n");

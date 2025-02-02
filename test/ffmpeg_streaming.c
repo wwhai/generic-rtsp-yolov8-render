@@ -148,7 +148,7 @@ int init_av_contexts(const char *input_url, const char *output_url,
 int main()
 {
     const char *input_url = "rtsp://192.168.10.5:554/av0_0";
-    const char *output_url = "rtmp://192.168.10.7:1935/live/tlive001";
+    const char *output_url = "rtmp://192.168.10.5:1935/live/tlive001";
 
     AVFormatContext *input_format_ctx = NULL;
     AVFormatContext *output_format_ctx = NULL;
