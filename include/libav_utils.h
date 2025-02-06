@@ -25,6 +25,8 @@ extern "C"
 #include <SDL2/SDL.h>
 }
 #include "frame_queue.h"
+// 获取错误字符串的全局缓冲区实现
+const char *get_av_error(int errnum);
 // 函数用于复制AVFrame
 // 注意：使用完毕后需要释放
 // @param srcFrame 源帧

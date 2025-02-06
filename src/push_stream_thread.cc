@@ -14,14 +14,8 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "push_stream_thread.h"
-
-const char *get_av_error(int errnum)
-{
-    static char str[AV_ERROR_MAX_STRING_SIZE];
-    av_strerror(errnum, str, sizeof(str));
-    return str;
-}
-
+#include "libav_utils.h"
+// 初始化 RTMP 流上下文
 int init_rtmp_stream(RtmpStreamContext *ctx, const char *output_url, int width, int height, int fps)
 {
     // 输出参数
@@ -61,8 +55,8 @@ int init_rtmp_stream(RtmpStreamContext *ctx, const char *output_url, int width, 
     ctx->codec_ctx->gop_size = 12;
 
     // H.264高级配置
-    av_opt_set(ctx->codec_ctx->priv_data, "preset", "fast", 0);
-    av_opt_set(ctx->codec_ctx->priv_data, "tune", "zerolatency", 0);
+    // av_opt_set(ctx->codec_ctx->priv_data, "preset", "fast", 0);
+    // av_opt_set(ctx->codec_ctx->priv_data, "tune", "zerolatency", 0);
 
     // 创建输出流
     ctx->video_stream = avformat_new_stream(ctx->output_ctx, NULL);
@@ -103,7 +97,7 @@ int init_rtmp_stream(RtmpStreamContext *ctx, const char *output_url, int width, 
     ret = avformat_write_header(ctx->output_ctx, NULL);
     if (ret < 0)
     {
-        fprintf(stderr, "Failed to write header: %s\n", get_av_error(ret));
+        fprintf(stderr, "Failed to write header:%d, %s\n", ret, get_av_error(ret));
         return -1;
     }
 
@@ -135,7 +129,6 @@ void push_stream(RtmpStreamContext *ctx, AVFrame *frame)
     }
 
     // 接收编码后的数据包
-    // 接收编码后的数据包
     while (1)
     {
         ret = avcodec_receive_packet(ctx->codec_ctx, pkt);
@@ -149,45 +142,33 @@ void push_stream(RtmpStreamContext *ctx, AVFrame *frame)
             fprintf(stderr, "Error encoding frame: %s\n", get_av_error(ret));
             break;
         }
+        // 输出 frame index
+        fprintf(stderr, "Packet index: %d\n", pkt->stream_index);
+        fprintf(stderr, "Codec time base: %d/%d\n", ctx->codec_ctx->time_base.num, ctx->codec_ctx->time_base.den);
+        fprintf(stderr, "Video stream time base: %d/%d\n", ctx->video_stream->time_base.num, ctx->video_stream->time_base.den);
+        fprintf(stderr, "BEFORE ====== PTS: %ld, DTS: %ld, Duration: %ld\n", pkt->pts, pkt->dts, pkt->duration);
 
-        // 确保时间戳被正确设置
-        if (pkt->pts == AV_NOPTS_VALUE)
-        {
-            // 如果编码器没有产生正确的 PTS，我们可以手动设置
-            pkt->pts = frame->pts;
-        }
-        if (pkt->dts == AV_NOPTS_VALUE)
-        {
-            pkt->dts = frame->pts;
-        }
-
-        // 手动计算并设置数据包的持续时间
-        if (pkt->duration == 0)
-        {
-            // 根据帧率计算持续时间
-            AVRational time_base = ctx->codec_ctx->time_base;
-            int fps = (int)(1 / av_q2d(time_base));
-            pkt->duration = av_rescale_q(1, (AVRational){1, fps}, time_base);
-        }
-
-        // 设置数据包属性
+        // 调整时间戳
+        pkt->pts = av_rescale_q_rnd(pkt->pts, ctx->codec_ctx->time_base, ctx->video_stream->time_base, (AVRounding)(AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX));
+        pkt->dts = av_rescale_q_rnd(pkt->dts, ctx->codec_ctx->time_base, ctx->video_stream->time_base, (AVRounding)(AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX));
+        int fps = 25;
+        AVRational codec_time_base = ctx->codec_ctx->time_base;
+        pkt->duration = av_rescale_q(1, (AVRational){1, fps}, codec_time_base);
+        pkt->pos = -1;
         pkt->stream_index = ctx->video_stream->index;
 
-        // 重新缩放时间戳
-        av_packet_rescale_ts(pkt, ctx->codec_ctx->time_base, ctx->video_stream->time_base);
+        fprintf(stderr, "AFTER ====== PTS: %ld, DTS: %ld, Duration: %ld\n", pkt->pts, pkt->dts, pkt->duration);
 
-        // 打印数据包信息
-        // fprintf(stdout, "Encoded packet information:\n");
-        // fprintf(stdout, "  size: %d\n", pkt->size);
-        // fprintf(stdout, "  pts: %" PRId64 "\n", pkt->pts);
-        // fprintf(stdout, "  dts: %" PRId64 "\n", pkt->dts);
-        // fprintf(stdout, "  duration: %" PRId64 "\n", pkt->duration);
-
-        // 发送数据包
+        // 检查数据包大小
+        if (pkt->size <= 0)
+        {
+            fprintf(stderr, "Packet size is invalid: %d\n", pkt->size);
+            return;
+        }
         ret = av_interleaved_write_frame(ctx->output_ctx, pkt);
         if (ret < 0)
         {
-            fprintf(stderr, "Error writing packet: %s\n", get_av_error(ret));
+            fprintf(stderr, "Error writing packet: %d, %s\n", ret, get_av_error(ret));
         }
 
         // 释放数据包
@@ -201,7 +182,7 @@ void push_stream(RtmpStreamContext *ctx, AVFrame *frame)
 void *push_rtmp_handler_thread(void *arg)
 {
     ThreadArgs *args = (ThreadArgs *)arg;
-    const char *output_url = "rtmp://192.168.10.5:1935/live/tlive001";
+    const char *output_url = "rtmp://192.168.10.8:1935/live/tlive001";
 
     RtmpStreamContext ctx;
     memset(&ctx, 0, sizeof(RtmpStreamContext));

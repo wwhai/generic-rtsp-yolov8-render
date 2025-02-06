@@ -13,8 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef PUSH_RTMP_H
-#define PUSH_RTMP_H
+// 录制视频线程处理函数，给出头文件的函数声明
+
+#ifndef __VIDEO_RECORD_H__
+#define __VIDEO_RECORD_H__
 
 extern "C"
 {
@@ -38,7 +40,7 @@ typedef struct
     AVFormatContext *output_ctx;
     AVStream *video_stream;
     AVCodecContext *codec_ctx;
-} RtmpStreamContext;
+} Mp4StreamContext;
 
 /// @brief
 /// @param ctx
@@ -47,15 +49,15 @@ typedef struct
 /// @param height
 /// @param fps
 /// @return
-int init_rtmp_stream(RtmpStreamContext *ctx, const char *output_url, int width, int height, int fps);
+int init_mp4_stream(Mp4StreamContext *ctx, const char *output_url, int width, int height, int fps);
 /// @brief
 /// @param ctx
 /// @param frame
-void push_stream(RtmpStreamContext *ctx, AVFrame *frame);
+void save_mp4(Mp4StreamContext *ctx, AVFrame *frame);
 
 /// @brief
 /// @param arg
 /// @return
-void *push_rtmp_handler_thread(void *arg);
+void *push_mp4_handler_thread(void *arg);
 
-#endif // PUSH_RTMP_H
+#endif

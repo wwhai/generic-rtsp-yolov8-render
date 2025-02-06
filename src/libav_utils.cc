@@ -14,6 +14,13 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include "libav_utils.h"
 #include "frame_queue.h"
+#include "stdio.h"
+const char *get_av_error(int errnum)
+{
+    static char str[AV_ERROR_MAX_STRING_SIZE];
+    av_strerror(errnum, str, sizeof(str));
+    return str;
+}
 // 函数用于复制AVFrame
 AVFrame *CopyAVFrame(AVFrame *srcFrame)
 {
@@ -23,9 +30,7 @@ AVFrame *CopyAVFrame(AVFrame *srcFrame)
         fprintf(stderr, "Could not allocate frame\n");
         return NULL;
     }
-    dstFrame->format = srcFrame->format;
-    dstFrame->width = srcFrame->width;
-    dstFrame->height = srcFrame->height;
+
     int ret = av_frame_get_buffer(dstFrame, 32);
     if (ret < 0)
     {
@@ -40,141 +45,32 @@ AVFrame *CopyAVFrame(AVFrame *srcFrame)
         av_frame_free(&dstFrame);
         return NULL;
     }
+    if (av_frame_copy_props(dstFrame, srcFrame) < 0)
+    {
+        fprintf(stderr, "Could not copy frame properties\n");
+        av_frame_free(&dstFrame);
+        return NULL;
+    }
     return dstFrame;
 }
-
+// 保存图像到文件,格式为png，不要用Libav的库，直接提取Avframe的Data
 int CaptureImage(AVFrame *srcFrame, const char *file_path)
 {
     if (!srcFrame || !file_path)
     {
-        fprintf(stderr, "Invalid input to CaptureImage\n");
+        fprintf(stderr, "Invalid input parameters\n");
         return -1;
     }
-
-    // Initialize variables
-    const AVCodec *jpegCodec = NULL;
-    AVCodecContext *codecCtx = NULL;
-    AVFrame *rgbFrame = NULL;
-    struct SwsContext *swsCtx = NULL;
-    FILE *file = NULL;
-    int ret = 0;
-    int rgbBufferSize = 0;
-    uint8_t *rgbBuffer;
-    // Allocate packet for JPEG encoding
-    AVPacket pkt;
-    pkt.data = NULL;
-    pkt.size = 0;
-
-    // Find the JPEG codec
-    jpegCodec = avcodec_find_encoder(AV_CODEC_ID_MJPEG);
-    if (!jpegCodec)
-    {
-        fprintf(stderr, "JPEG codec not found\n");
-        return -1;
-    }
-
-    // Allocate codec context
-    codecCtx = avcodec_alloc_context3(jpegCodec);
-    if (!codecCtx)
-    {
-        fprintf(stderr, "Could not allocate codec context\n");
-        return -1;
-    }
-
-    // Set codec parameters
-    codecCtx->pix_fmt = AV_PIX_FMT_YUVJ420P;
-    codecCtx->width = srcFrame->width;
-    codecCtx->height = srcFrame->height;
-    codecCtx->time_base = (AVRational){1, 25};
-
-    // Open codec
-    if ((ret = avcodec_open2(codecCtx, jpegCodec, NULL)) < 0)
-    {
-        char buffer[64] = {0};
-        char *error = av_make_error_string(buffer, 64, ret);
-        fprintf(stderr, "Could not open codec: %s\n", error);
-        goto cleanup;
-    }
-
-    // Allocate frame for RGB conversion
-    rgbFrame = av_frame_alloc();
-    if (!rgbFrame)
-    {
-        fprintf(stderr, "Could not allocate RGB frame\n");
-        ret = -1;
-        goto cleanup;
-    }
-
-    // Set up RGB frame
-    rgbBufferSize = av_image_get_buffer_size(AV_PIX_FMT_RGB24, srcFrame->width, srcFrame->height, 1);
-    rgbBuffer = (uint8_t *)av_malloc(rgbBufferSize);
-    if (!rgbBuffer)
-    {
-        fprintf(stderr, "Could not allocate RGB buffer\n");
-        ret = -1;
-        goto cleanup;
-    }
-    av_image_fill_arrays(rgbFrame->data, rgbFrame->linesize, rgbBuffer, AV_PIX_FMT_RGB24, srcFrame->width, srcFrame->height, 1);
-
-    // Set up SwsContext for RGB conversion
-    swsCtx = sws_getContext(srcFrame->width, srcFrame->height, (enum AVPixelFormat)srcFrame->format,
-                            srcFrame->width, srcFrame->height, AV_PIX_FMT_RGB24,
-                            SWS_BICUBIC, NULL, NULL, NULL);
-    if (!swsCtx)
-    {
-        fprintf(stderr, "Could not create SwsContext\n");
-        ret = -1;
-        goto cleanup;
-    }
-
-    // Convert frame to RGB
-    sws_scale(swsCtx, (const uint8_t *const *)srcFrame->data, srcFrame->linesize, 0, srcFrame->height,
-              rgbFrame->data, rgbFrame->linesize);
-
-    // Send frame to encoder
-    if ((ret = avcodec_send_frame(codecCtx, rgbFrame)) < 0)
-    {
-        char buffer[64] = {0};
-        char *error = av_make_error_string(buffer, 64, ret);
-        fprintf(stderr, "Error sending frame to encoder: %s\n", error);
-        goto cleanup;
-    }
-
-    // Receive encoded packet
-    ret = avcodec_receive_packet(codecCtx, &pkt);
-    if (ret < 0)
-    {
-        char buffer[64] = {0};
-        char *error = av_make_error_string(buffer, 64, ret);
-        fprintf(stderr, "Error receiving packet from encoder: %s\n", error);
-        goto cleanup;
-    }
-
-    // Write packet to file
-    file = fopen(file_path, "wb");
+    FILE *file = fopen(file_path, "wb");
     if (!file)
     {
-        fprintf(stderr, "Could not open file for writing: %s\n", file_path);
-        ret = -1;
-        goto cleanup;
+        fprintf(stderr, "Could not open file: %s\n", file_path);
+        return -1;
     }
-    fwrite(pkt.data, 1, pkt.size, file);
-
-    // Success
-    ret = 0;
-
-cleanup:
-    if (file)
-        fclose(file);
-    if (rgbFrame)
-        av_frame_free(&rgbFrame);
-    if (codecCtx)
-        avcodec_free_context(&codecCtx);
-    if (swsCtx)
-        sws_freeContext(swsCtx);
-    av_packet_unref(&pkt);
-
-    return ret;
+    // 写入文件头
+    fwrite(srcFrame->data[0], 1, srcFrame->linesize[0] * srcFrame->height, file);
+    fclose(file);
+    return 0;
 }
 
 /**
