@@ -21,38 +21,7 @@ const char *get_av_error(int errnum)
     av_strerror(errnum, str, sizeof(str));
     return str;
 }
-// 函数用于复制AVFrame
-AVFrame *CopyAVFrame(AVFrame *srcFrame)
-{
-    AVFrame *dstFrame = av_frame_alloc();
-    if (!dstFrame)
-    {
-        fprintf(stderr, "Could not allocate frame\n");
-        return NULL;
-    }
 
-    int ret = av_frame_get_buffer(dstFrame, 32);
-    if (ret < 0)
-    {
-        fprintf(stderr, "Could not allocate new frame buffer\n");
-        av_frame_free(&dstFrame);
-        return NULL;
-    }
-    ret = av_frame_copy(dstFrame, srcFrame);
-    if (ret < 0)
-    {
-        fprintf(stderr, "Could not copy frame\n");
-        av_frame_free(&dstFrame);
-        return NULL;
-    }
-    if (av_frame_copy_props(dstFrame, srcFrame) < 0)
-    {
-        fprintf(stderr, "Could not copy frame properties\n");
-        av_frame_free(&dstFrame);
-        return NULL;
-    }
-    return dstFrame;
-}
 // 保存图像到文件,格式为png，不要用Libav的库，直接提取Avframe的Data
 int CaptureImage(AVFrame *srcFrame, const char *file_path)
 {

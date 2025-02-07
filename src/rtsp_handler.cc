@@ -26,7 +26,7 @@ extern "C"
 #include "frame_queue.h"
 #include "rtsp_handler.h"
 #include "libav_utils.h"
-
+#include "push_stream_thread.h"
 void *pull_rtsp_handler_thread(void *arg)
 {
     const ThreadArgs *args = (ThreadArgs *)arg;
@@ -34,9 +34,10 @@ void *pull_rtsp_handler_thread(void *arg)
     int ret;
 
     // Open RTSP input stream
-    if ((ret = avformat_open_input(&fmt_ctx, args->rtsp_url, NULL, NULL)) < 0)
+    fprintf(stderr, "pull_rtsp_handler_thread: %s\n", args->input_stream_url);
+    if ((ret = avformat_open_input(&fmt_ctx, args->input_stream_url, NULL, NULL)) < 0)
     {
-        fprintf(stderr, "Error: Could not open RTSP stream :(%s).\n", args->rtsp_url);
+        fprintf(stderr, "Error: Could not open RTSP stream :(%s).\n", args->input_stream_url);
         pthread_exit(NULL);
     }
 
@@ -66,7 +67,7 @@ void *pull_rtsp_handler_thread(void *arg)
     }
 
     // Print stream information
-    av_dump_format(fmt_ctx, 0, args->rtsp_url, 0);
+    av_dump_format(fmt_ctx, 0, args->input_stream_url, 0);
 
     // Allocate AVPacket for reading frames
     AVPacket *origin_packet = av_packet_alloc();
@@ -133,8 +134,22 @@ void *pull_rtsp_handler_thread(void *arg)
         printf("  codec_type: %s\n", av_get_media_type_string(stream->codecpar->codec_type));
         printf("  codec_name: %s\n", avcodec_get_name(stream->codecpar->codec_id));
     }
-    fprintf(stderr, "RTSP handler thread started. Pull stream: %s\n", args->rtsp_url);
-
+    // Create a thread for pushing frames to the output stream
+    pthread_t push_rtsp_thread;
+    Context *push_rtmp_handler_thread_ctx = CreateContext();
+    ThreadArgs push_rtmp_handler_thread_args;
+    // Copy the necessary data to the push_rtmp_handler_thread_args struct
+    push_rtmp_handler_thread_args.ctx = push_rtmp_handler_thread_ctx;
+    push_rtmp_handler_thread_args.origin_frame_queue = args->origin_frame_queue;
+    push_rtmp_handler_thread_args.output_stream_url = args->output_stream_url;
+    push_rtmp_handler_thread_args.input_stream = fmt_ctx->streams[video_stream_index];
+    fprintf(stderr, "push_rtmp_handler_thread: %s\n", args->output_stream_url);
+    if (pthread_create(&push_rtsp_thread, NULL, push_rtmp_handler_thread, (void *)&push_rtmp_handler_thread_args) != 0)
+    {
+        perror("Failed to create push_rtmp_handler_thread thread");
+        exit(1);
+    }
+    pthread_detach(push_rtsp_thread);
     // Read frames from the stream
     while (av_read_frame(fmt_ctx, origin_packet) >= 0)
     {
@@ -186,7 +201,7 @@ void *pull_rtsp_handler_thread(void *arg)
             else
             {
                 {
-                    AVFrame *display_frame = CopyAVFrame(origin_frame);
+                    AVFrame *display_frame = av_frame_clone(origin_frame);
                     QueueItem outputItem;
                     outputItem.type = ONLY_FRAME;
                     outputItem.data = display_frame;
@@ -197,7 +212,7 @@ void *pull_rtsp_handler_thread(void *arg)
                     }
                 }
                 {
-                    AVFrame *output_frame = CopyAVFrame(origin_frame);
+                    AVFrame *output_frame = av_frame_clone(origin_frame);
                     QueueItem outputItem;
                     outputItem.type = ONLY_FRAME;
                     outputItem.data = output_frame;
@@ -208,7 +223,8 @@ void *pull_rtsp_handler_thread(void *arg)
                     }
                 }
                 {
-                    AVFrame *detection_frame = CopyAVFrame(origin_frame);
+
+                    AVFrame *detection_frame = av_frame_clone(origin_frame);
                     QueueItem outputItem;
                     outputItem.type = ONLY_FRAME;
                     outputItem.data = detection_frame;

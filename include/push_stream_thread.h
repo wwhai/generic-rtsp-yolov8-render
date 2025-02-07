@@ -35,9 +35,10 @@ extern "C"
 #include "thread_args.h"
 typedef struct
 {
-    AVFormatContext *output_ctx;
-    AVStream *video_stream;
-    AVCodecContext *codec_ctx;
+    AVFormatContext *output_ctx;      // 输出格式上下文
+    AVCodecContext *output_codec_ctx; // 输出编码器上下文
+    AVStream *input_stream;           // 输入流
+    AVStream *output_stream;          // 输出流
 } RtmpStreamContext;
 
 /// @brief
