@@ -102,9 +102,7 @@ void *pull_rtsp_handler_thread(void *arg)
     // Copy codec parameters to the codec context
     if ((ret = avcodec_parameters_to_context(codec_ctx, codecpar)) < 0)
     {
-        char err_str[AV_ERROR_MAX_STRING_SIZE];
-        av_make_error_string(err_str, AV_ERROR_MAX_STRING_SIZE, ret);
-        fprintf(stderr, "Error: Failed to copy codec parameters to codec context (%s).\n", err_str);
+        fprintf(stderr, "Error: Failed to copy codec parameters to codec context (%s).\n", get_av_error(ret));
         avcodec_free_context(&codec_ctx);
         avformat_close_input(&fmt_ctx);
         av_packet_free(&origin_packet);
@@ -114,9 +112,7 @@ void *pull_rtsp_handler_thread(void *arg)
     // Open the codec
     if ((ret = avcodec_open2(codec_ctx, decoder, NULL)) < 0)
     {
-        char err_str[AV_ERROR_MAX_STRING_SIZE];
-        av_make_error_string(err_str, AV_ERROR_MAX_STRING_SIZE, ret);
-        fprintf(stderr, "Error: Failed to open codec (%s).\n", err_str);
+        fprintf(stderr, "Error: Failed to open codec (%s).\n", get_av_error(ret));
         avcodec_free_context(&codec_ctx);
         avformat_close_input(&fmt_ctx);
         av_packet_free(&origin_packet);
@@ -139,7 +135,18 @@ void *pull_rtsp_handler_thread(void *arg)
     ThreadArgs push_rtsp_thread_args = *args;
     pthread_t push_rtsp_thread;
     // 复制上下文的参数
-    push_rtsp_thread_args.input_stream_codecpar = fmt_ctx->streams[video_stream_index]->codecpar;
+    AVCodecParameters *params = avcodec_parameters_alloc();
+    if (!params)
+    {
+        return NULL;
+    }
+    ret = avcodec_parameters_from_context(params, codec_ctx);
+    if (ret < 0)
+    {
+        avcodec_parameters_free(&params);
+        return NULL;
+    }
+    push_rtsp_thread_args.input_stream_codecpar = params;
     if (pthread_create(&push_rtsp_thread, NULL, push_rtmp_handler_thread, (void *)&push_rtsp_thread_args) != 0)
     {
         fprintf(stderr, "Failed to create RTSP thread");

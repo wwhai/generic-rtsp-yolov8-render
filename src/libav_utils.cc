@@ -247,3 +247,29 @@ Box InterpolateBox(Box prevBox, Box currentBox, float t)
     strcpy(result.label, currentBox.label);
     return result;
 }
+//
+void copy_codec_context_properties(AVCodecContext *src_ctx, AVCodecContext *dst_ctx)
+{
+    AVCodecParameters *params = avcodec_parameters_alloc();
+    if (!params)
+    {
+        // 处理内存分配失败的情况
+        return;
+    }
+    // 将源编解码器上下文的参数复制到 AVCodecParameters
+    int ret = avcodec_parameters_from_context(params, src_ctx);
+    if (ret < 0)
+    {
+        // 处理复制失败的情况
+        avcodec_parameters_free(&params);
+        return;
+    }
+    // 将 AVCodecParameters 的参数复制到目标编解码器上下文
+    ret = avcodec_parameters_to_context(dst_ctx, params);
+    if (ret < 0)
+    {
+        // 处理复制失败的情况
+    }
+    // 释放 AVCodecParameters
+    avcodec_parameters_free(&params);
+}

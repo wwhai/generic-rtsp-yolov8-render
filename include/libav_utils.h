@@ -34,5 +34,6 @@ int CaptureImage(AVFrame *srcFrame, const char *file_path);
 int RecordAVFrameToMP4(const char *output_file, AVFrame *frames[], int num_frames, int width, int height, int fps);
 //
 Box InterpolateBox(Box prevBox, Box currentBox, float t);
-
+//
+void copy_codec_context_properties(AVCodecContext *src_ctx, AVCodecContext *dst_ctx);
 #endif

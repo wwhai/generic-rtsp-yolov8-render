@@ -18,6 +18,11 @@
 // 初始化 RTMP 流上下文
 int init_rtmp_stream(RtmpStreamContext *ctx, const char *output_url, int width, int height, int fps)
 {
+    if (!ctx || !output_url)
+    {
+        fprintf(stderr, "Invalid input parameters for init_rtmp_stream\n");
+        return -1;
+    }
     // 输出参数
     fprintf(stderr, "init_rtmp_stream === output_url=%s,width=%d,height=%d,fps=%d\n",
             output_url, width, height, fps);
@@ -28,60 +33,60 @@ int init_rtmp_stream(RtmpStreamContext *ctx, const char *output_url, int width, 
         fprintf(stderr, "Failed to create output context: %s\n", get_av_error(ret));
         return -1;
     }
-
     // 查找编码器
     const AVCodec *codec = avcodec_find_encoder(AV_CODEC_ID_H264);
     if (!codec)
     {
         fprintf(stderr, "H.264 encoder not found\n");
-        return -1;
+        goto cleanup_output_context;
     }
-
     // 创建编码器上下文
     ctx->codec_ctx = avcodec_alloc_context3(codec);
     if (!ctx->codec_ctx)
     {
         fprintf(stderr, "Failed to allocate codec context\n");
-        return -1;
+        goto cleanup_output_context;
     }
-
+    // 从输入流复制编解码器参数到编码器上下文
+    if (ctx->input_stream_codecpar)
+    {
+        ret = avcodec_parameters_to_context(ctx->codec_ctx, ctx->input_stream_codecpar);
+        if (ret < 0)
+        {
+            fprintf(stderr, "Failed to copy codec parameters from input stream: %s\n", get_av_error(ret));
+            goto cleanup_codec_context;
+        }
+    }
     // 配置编码参数
     ctx->codec_ctx->width = width;
     ctx->codec_ctx->height = height;
     ctx->codec_ctx->pix_fmt = AV_PIX_FMT_YUV420P;
     ctx->codec_ctx->time_base = (AVRational){1, fps};
     ctx->codec_ctx->framerate = (AVRational){fps, 1};
-    ctx->codec_ctx->bit_rate = 4000000;
-    ctx->codec_ctx->gop_size = 12;
-
-    // H.264高级配置
-    // av_opt_set(ctx->codec_ctx->priv_data, "preset", "fast", 0);
-    // av_opt_set(ctx->codec_ctx->priv_data, "tune", "zerolatency", 0);
-
+    // H.264 高级配置
+    av_opt_set(ctx->codec_ctx->priv_data, "preset", "fast", 0);
+    av_opt_set(ctx->codec_ctx->priv_data, "tune", "zerolatency", 0);
     // 创建输出流
     ctx->video_stream = avformat_new_stream(ctx->output_ctx, NULL);
     if (!ctx->video_stream)
     {
         fprintf(stderr, "Failed to create video stream\n");
-        return -1;
+        goto cleanup_codec_context;
     }
-
-    // 关联编码器参数到流
+    // 关联编码器参数到输出流
     ret = avcodec_parameters_from_context(ctx->video_stream->codecpar, ctx->codec_ctx);
     if (ret < 0)
     {
-        fprintf(stderr, "Failed to copy codec parameters: %s\n", get_av_error(ret));
-        return -1;
+        fprintf(stderr, "Failed to copy codec parameters to output stream: %s\n", get_av_error(ret));
+        goto cleanup_codec_context;
     }
-
     // 打开编码器
     ret = avcodec_open2(ctx->codec_ctx, codec, NULL);
     if (ret < 0)
     {
         fprintf(stderr, "Failed to open codec: %s\n", get_av_error(ret));
-        return -1;
+        goto cleanup_codec_context;
     }
-
     // 打开网络输出
     if (!(ctx->output_ctx->oformat->flags & AVFMT_NOFILE))
     {
@@ -89,21 +94,28 @@ int init_rtmp_stream(RtmpStreamContext *ctx, const char *output_url, int width, 
         if (ret < 0)
         {
             fprintf(stderr, "Failed to open output URL: %s\n", get_av_error(ret));
-            return -1;
+            goto cleanup_codec_context;
         }
     }
-
     // 写入文件头
     ret = avformat_write_header(ctx->output_ctx, NULL);
     if (ret < 0)
     {
-        fprintf(stderr, "Failed to write header:%d, %s\n", ret, get_av_error(ret));
-        return -1;
+        fprintf(stderr, "Failed to write header: %d, %s\n", ret, get_av_error(ret));
+        goto cleanup_io;
     }
-
     return 0;
+cleanup_io:
+    if (!(ctx->output_ctx->oformat->flags & AVFMT_NOFILE))
+    {
+        avio_closep(&ctx->output_ctx->pb);
+    }
+cleanup_codec_context:
+    avcodec_free_context(&ctx->codec_ctx);
+cleanup_output_context:
+    avformat_free_context(ctx->output_ctx);
+    return -1;
 }
-
 // 优化后的 push_stream 函数
 void push_stream(RtmpStreamContext *ctx, AVFrame *frame)
 {
@@ -128,6 +140,7 @@ void push_stream(RtmpStreamContext *ctx, AVFrame *frame)
     }
     static int64_t last_dts = -1; // 用于记录上一个 DTS
     static int64_t last_pts = -1; // 用于记录上一个 PTS
+    static int frame_count = 0;   // 记录处理的帧数
     // 接收编码后的数据包
     while (1)
     {
@@ -142,11 +155,6 @@ void push_stream(RtmpStreamContext *ctx, AVFrame *frame)
             fprintf(stderr, "Error encoding frame: %s\n", get_av_error(ret));
             break;
         }
-        // 输出 frame index
-        fprintf(stderr, "Packet index: %d\n", pkt->stream_index);
-        fprintf(stderr, "Codec time base: %d/%d\n", ctx->codec_ctx->time_base.num, ctx->codec_ctx->time_base.den);
-        fprintf(stderr, "Video stream time base: %d/%d\n", ctx->video_stream->time_base.num, ctx->video_stream->time_base.den);
-        fprintf(stderr, "BEFORE ====== PTS: %ld, DTS: %ld, Duration: %ld\n", pkt->pts, pkt->dts, pkt->duration);
         // 调整时间戳
         if (pkt->pts != AV_NOPTS_VALUE)
         {
@@ -172,7 +180,13 @@ void push_stream(RtmpStreamContext *ctx, AVFrame *frame)
         }
         last_dts = pkt->dts;
         last_pts = pkt->pts;
-        fprintf(stderr, "AFTER ====== PTS: %ld, DTS: %ld, Duration: %ld\n", pkt->pts, pkt->dts, pkt->duration);
+        frame_count++;
+        if (frame_count >= 1000000)
+        {
+            last_dts = -1;
+            last_pts = -1;
+            frame_count = 0;
+        }
         // 检查数据包大小
         if (pkt->size <= 0)
         {
@@ -198,7 +212,7 @@ void *push_rtmp_handler_thread(void *arg)
 
     RtmpStreamContext ctx;
     memset(&ctx, 0, sizeof(RtmpStreamContext));
-
+    ctx.input_stream_codecpar = args->input_stream_codecpar;
     // 初始化输出流
     if (init_rtmp_stream(&ctx, args->output_stream_url, 1920, 1080, 25) < 0)
     {
