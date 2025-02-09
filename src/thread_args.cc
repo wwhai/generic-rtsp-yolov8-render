@@ -19,11 +19,4 @@ void dump_thread_args(ThreadArgs *args)
     fprintf(stderr, "=== dump_thread_args ===\n");
     fprintf(stderr, "input_stream_url=%s\n", args->input_stream_url);
     fprintf(stderr, "output_stream_url=%s\n", args->output_stream_url);
-    fprintf(stderr, "video_queue=%p\n", args->video_queue);
-    fprintf(stderr, "detection_queue=%p\n", args->detection_queue);
-    fprintf(stderr, "box_queue=%p\n", args->box_queue);
-    fprintf(stderr, "origin_frame_queue=%p\n", args->origin_frame_queue);
-    fprintf(stderr, "infer_frame_queue=%p\n", args->infer_frame_queue);
-    fprintf(stderr, "input_stream_codecpar=%p\n", args->input_stream_codecpar);
-    fprintf(stderr, "ctx=%p\n\n", args->ctx);
 }

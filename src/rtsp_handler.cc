@@ -130,29 +130,56 @@ void *pull_rtsp_handler_thread(void *arg)
         printf("  codec_name: %s\n", avcodec_get_name(stream->codecpar->codec_id));
     }
     fprintf(stderr, "RTSP handler thread started. Pull stream: %s\n", args->input_stream_url);
+    // Context *record_mp4_thread_ctx;
+    // {
+    //     record_mp4_thread_ctx = CreateContext();
+    //     ThreadArgs record_mp4_thread_args = *args;
+    //     pthread_t record_mp4_thread;
+    //     // 复制上下文的参数
+    //     AVCodecParameters *params = avcodec_parameters_alloc();
+    //     if (!params)
+    //     {
+    //         return NULL;
+    //     }
+    //     ret = avcodec_parameters_from_context(params, codec_ctx);
+    //     if (ret < 0)
+    //     {
+    //         avcodec_parameters_free(&params);
+    //         return NULL;
+    //     }
+    //     record_mp4_thread_args.input_stream_codecpar = params;
+    //     if (pthread_create(&record_mp4_thread, NULL, push_rtmp_handler_thread, (void *)&record_mp4_thread_args) != 0)
+    //     {
+    //         fprintf(stderr, "Failed to create push_rtmp_handler thread");
+    //         return NULL;
+    //     }
+    //     pthread_detach(record_mp4_thread);
+    // }
     Context *push_rtsp_thread_ctx;
-    push_rtsp_thread_ctx = CreateContext();
-    ThreadArgs push_rtsp_thread_args = *args;
-    pthread_t push_rtsp_thread;
-    // 复制上下文的参数
-    AVCodecParameters *params = avcodec_parameters_alloc();
-    if (!params)
     {
-        return NULL;
+        push_rtsp_thread_ctx = CreateContext();
+        ThreadArgs push_rtsp_thread_args = *args;
+        pthread_t push_rtsp_thread;
+        // 复制上下文的参数
+        AVCodecParameters *params = avcodec_parameters_alloc();
+        if (!params)
+        {
+            return NULL;
+        }
+        ret = avcodec_parameters_from_context(params, codec_ctx);
+        if (ret < 0)
+        {
+            avcodec_parameters_free(&params);
+            return NULL;
+        }
+        push_rtsp_thread_args.input_stream_codecpar = params;
+        if (pthread_create(&push_rtsp_thread, NULL, push_rtmp_handler_thread, (void *)&push_rtsp_thread_args) != 0)
+        {
+            fprintf(stderr, "Failed to create RTSP thread");
+            return NULL;
+        }
+        pthread_detach(push_rtsp_thread);
     }
-    ret = avcodec_parameters_from_context(params, codec_ctx);
-    if (ret < 0)
-    {
-        avcodec_parameters_free(&params);
-        return NULL;
-    }
-    push_rtsp_thread_args.input_stream_codecpar = params;
-    if (pthread_create(&push_rtsp_thread, NULL, push_rtmp_handler_thread, (void *)&push_rtsp_thread_args) != 0)
-    {
-        fprintf(stderr, "Failed to create RTSP thread");
-        return NULL;
-    }
-    pthread_detach(push_rtsp_thread);
     // Read frames from the stream
     while (av_read_frame(fmt_ctx, origin_packet) >= 0)
     {
@@ -166,10 +193,7 @@ void *pull_rtsp_handler_thread(void *arg)
             ret = avcodec_send_packet(codec_ctx, origin_packet);
             if (ret < 0)
             {
-                char err_str[AV_ERROR_MAX_STRING_SIZE];
-                av_make_error_string(err_str, AV_ERROR_MAX_STRING_SIZE, ret);
-                fprintf(stderr, "Error: Failed to send packet to decoder (%s).\n", err_str);
-                // Free the packet for the next read
+                fprintf(stderr, "Error: Failed to send packet to decoder (%s).\n", get_av_error(ret));
                 av_packet_unref(origin_packet);
                 continue;
             }
@@ -177,8 +201,7 @@ void *pull_rtsp_handler_thread(void *arg)
             AVFrame *origin_frame = av_frame_alloc();
             if (!origin_frame)
             {
-                fprintf(stderr, "Error: Failed to allocate frame.\n");
-                // Free the packet for the next read
+                fprintf(stderr, "Error: Failed to allocate frame(%s).\n", get_av_error(ret));
                 av_packet_unref(origin_packet);
                 continue;
             }
@@ -194,9 +217,7 @@ void *pull_rtsp_handler_thread(void *arg)
             }
             else if (ret < 0)
             {
-                char err_str[AV_ERROR_MAX_STRING_SIZE];
-                av_make_error_string(err_str, AV_ERROR_MAX_STRING_SIZE, ret);
-                fprintf(stderr, "Error: Failed to receive frame from decoder (%s).\n", err_str);
+                fprintf(stderr, "Error: Failed to receive frame from decoder (%s).\n", get_av_error(ret));
                 av_frame_free(&origin_frame);
                 av_packet_unref(origin_packet);
                 continue;
@@ -204,14 +225,14 @@ void *pull_rtsp_handler_thread(void *arg)
             else
             {
                 {
-                    AVFrame *display_frame = av_frame_clone(origin_frame);
+                    AVFrame *output_frame = av_frame_clone(origin_frame);
                     QueueItem outputItem;
                     outputItem.type = ONLY_FRAME;
-                    outputItem.data = display_frame;
+                    outputItem.data = output_frame;
                     memset(outputItem.Boxes, 0, sizeof(outputItem.Boxes));
                     if (!enqueue(args->video_queue, outputItem))
                     {
-                        av_frame_free(&display_frame);
+                        av_frame_free(&output_frame);
                     }
                 }
                 {
@@ -226,14 +247,25 @@ void *pull_rtsp_handler_thread(void *arg)
                     }
                 }
                 {
-                    AVFrame *detection_frame = av_frame_clone(origin_frame);
+                    AVFrame *output_frame = av_frame_clone(origin_frame);
                     QueueItem outputItem;
                     outputItem.type = ONLY_FRAME;
-                    outputItem.data = detection_frame;
+                    outputItem.data = output_frame;
+                    memset(outputItem.Boxes, 0, sizeof(outputItem.Boxes));
+                    if (!enqueue(args->record_frame_queue, outputItem))
+                    {
+                        av_frame_free(&output_frame);
+                    }
+                }
+                {
+                    AVFrame *output_frame = av_frame_clone(origin_frame);
+                    QueueItem outputItem;
+                    outputItem.type = ONLY_FRAME;
+                    outputItem.data = output_frame;
                     memset(outputItem.Boxes, 0, sizeof(outputItem.Boxes));
                     if (!enqueue(args->detection_queue, outputItem))
                     {
-                        av_frame_free(&detection_frame);
+                        av_frame_free(&output_frame);
                     }
                 }
             }
@@ -245,7 +277,9 @@ void *pull_rtsp_handler_thread(void *arg)
 END:
     fprintf(stderr, "RTSP handler thread stopped. Pull stream: %s\n", args->input_stream_url);
     CancelContext(push_rtsp_thread_ctx);
+    // CancelContext(record_mp4_thread_ctx);
     pthread_mutex_destroy(&push_rtsp_thread_ctx->mtx);
+    // pthread_mutex_destroy(&record_mp4_thread_ctx->mtx);
     avcodec_free_context(&codec_ctx);
     av_packet_free(&origin_packet);
     avformat_close_input(&fmt_ctx);

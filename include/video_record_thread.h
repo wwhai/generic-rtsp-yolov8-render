@@ -40,6 +40,7 @@ typedef struct
     AVFormatContext *output_ctx;
     AVStream *video_stream;
     AVCodecContext *codec_ctx;
+    AVCodecParameters *input_stream_codecpar;
 } Mp4StreamContext;
 
 /// @brief
@@ -58,6 +59,6 @@ void save_mp4(Mp4StreamContext *ctx, AVFrame *frame);
 /// @brief
 /// @param arg
 /// @return
-void *push_mp4_handler_thread(void *arg);
+void *save_mp4_handler_thread(void *arg);
 
 #endif

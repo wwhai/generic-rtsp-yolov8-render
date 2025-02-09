@@ -26,109 +26,138 @@
 #include "background.h"
 #include "context.h"
 #include "push_stream_thread.h"
-/// @brief
-Context *background_thread_ctx;
-Context *pull_rtsp_thread_ctx;
-Context *video_renderer_thread_ctx;
-Context *detection_thread_ctx;
-/// @brief
-/// @param sig
+
+// 全局上下文指针数组
+Context *contexts[4];
+
+// 信号处理函数
 void handle_signal(int sig)
 {
-    CancelContext(pull_rtsp_thread_ctx);
-    CancelContext(video_renderer_thread_ctx);
-    CancelContext(detection_thread_ctx);
-    CancelContext(background_thread_ctx);
+    for (int i = 0; i < 4; i++)
+    {
+        if (contexts[i])
+        {
+            CancelContext(contexts[i]);
+        }
+    }
     fprintf(stderr, "Received signal %d, exiting...\n", sig);
     exit(0);
+}
+
+// 创建线程的辅助函数
+int create_thread(pthread_t *thread, void *(*start_routine)(void *), void *arg)
+{
+    int ret = pthread_create(thread, NULL, start_routine, arg);
+    if (ret != 0)
+    {
+        perror("Failed to create thread");
+        return -1;
+    }
+    return 0;
+}
+
+// 销毁上下文的辅助函数
+void destroy_contexts()
+{
+    for (int i = 0; i < 4; i++)
+    {
+        if (contexts[i])
+        {
+            CancelContext(contexts[i]);
+            if (i > 0)
+            {
+                pthread_mutex_destroy(&contexts[i]->mtx);
+            }
+            else
+            {
+                pthread_cond_destroy(&contexts[i]->cond);
+            }
+        }
+    }
+}
+
+// 销毁帧队列的辅助函数
+void destroy_frame_queues(FrameQueue *queues, int num_queues)
+{
+    for (int i = 0; i < num_queues; i++)
+    {
+        frame_queue_destroy(&queues[i]);
+    }
 }
 
 int main(int argc, char *argv[])
 {
     if (argc < 3)
     {
-        fprintf(stderr, "Usage: %s <RTSP_URL>\n", argv[0]);
+        fprintf(stderr, "Usage: %s <RTSP_URL> <PUSH_URL>\n", argv[0]);
         return 1;
     }
+
+    // 设置信号处理函数
     if (signal(SIGINT, handle_signal) == SIG_ERR)
     {
         perror("Failed to set signal handler for SIGTERM");
         return 1;
     }
+
     const char *pull_from_rtsp_url = argv[1];
     const char *push_to_rtsp_url = argv[2];
-    background_thread_ctx = CreateContext();
-    pull_rtsp_thread_ctx = CreateContext();
-    video_renderer_thread_ctx = CreateContext();
-    detection_thread_ctx = CreateContext();
 
-    // Initialize frame queues
-    FrameQueue video_queue, detection_queue, box_queue, origin_frame_queue, infer_frame_queue;
-    frame_queue_init(&video_queue, 60);
-    frame_queue_init(&detection_queue, 60);
-    frame_queue_init(&box_queue, 60);
-    frame_queue_init(&origin_frame_queue, 60);
-    frame_queue_init(&infer_frame_queue, 60);
+    // 创建上下文
+    contexts[0] = CreateContext();
+    contexts[1] = CreateContext();
+    contexts[2] = CreateContext();
+    contexts[3] = CreateContext();
 
-    // Create threads
-    pthread_t background_thread, pull_rtsp_thread, renderer_thread, detection_thread;
-    //
-    ThreadArgs background_thread_args = {.ctx = background_thread_ctx};
+    // 检查上下文是否创建成功
+    for (int i = 0; i < 4; i++)
+    {
+        if (!contexts[i])
+        {
+            fprintf(stderr, "Failed to create context %d\n", i);
+            destroy_contexts();
+            return 1;
+        }
+    }
 
-    ThreadArgs pull_rtsp_thread_args = {pull_from_rtsp_url, push_to_rtsp_url, &video_queue,
-                                        &detection_queue, &box_queue, &origin_frame_queue,
-                                        &infer_frame_queue, NULL, pull_rtsp_thread_ctx};
-    ThreadArgs video_renderer_thread_args = {pull_from_rtsp_url, push_to_rtsp_url, &video_queue,
-                                             &detection_queue, &box_queue, &origin_frame_queue,
-                                             &infer_frame_queue, NULL, pull_rtsp_thread_ctx};
-    ThreadArgs detection_thread_args = {pull_from_rtsp_url, push_to_rtsp_url, &video_queue,
-                                        &detection_queue, &box_queue, &origin_frame_queue,
-                                        &infer_frame_queue, NULL, pull_rtsp_thread_ctx};
-    if (pthread_create(&background_thread, NULL, background_task_thread, (void *)&background_thread_args) != 0)
+    // 初始化帧队列
+    FrameQueue queues[6];
+    for (int i = 0; i < 6; i++)
     {
-        perror("Failed to create RTSP thread");
-        goto END;
+        frame_queue_init(&queues[i], 60);
     }
-    //
-    if (pthread_create(&pull_rtsp_thread, NULL, pull_rtsp_handler_thread, (void *)&pull_rtsp_thread_args) != 0)
+
+    // 创建线程参数
+    ThreadArgs background_thread_args = {.ctx = contexts[0]};
+    ThreadArgs common_args = {pull_from_rtsp_url, push_to_rtsp_url, &queues[0], &queues[1], &queues[2],
+                              &queues[3], &queues[4], &queues[5], NULL, contexts[1]};
+
+    // 创建线程
+    pthread_t threads[4];
+    if (create_thread(&threads[0], background_task_thread, &background_thread_args) != 0 ||
+        create_thread(&threads[1], pull_rtsp_handler_thread, &common_args) != 0 ||
+        create_thread(&threads[2], video_renderer_thread, &common_args) != 0 ||
+        create_thread(&threads[3], frame_detection_thread, &common_args) != 0)
     {
-        perror("Failed to create RTSP thread");
-        goto END;
+        destroy_contexts();
+        destroy_frame_queues(queues, 6);
+        return 1;
     }
-    //
-    if (pthread_create(&renderer_thread, NULL, video_renderer_thread, (void *)&video_renderer_thread_args) != 0)
-    {
-        perror("Failed to create video renderer thread");
-        goto END;
-    }
-    //
-    if (pthread_create(&detection_thread, NULL, frame_detection_thread, (void *)&detection_thread_args) != 0)
-    {
-        perror("Failed to create detection thread");
-        goto END;
-    }
+
     fprintf(stderr, "Main thread waiting for threads to finish...\n");
-    pthread_detach(pull_rtsp_thread);
-    pthread_detach(renderer_thread);
-    pthread_detach(detection_thread);
-    pthread_join(background_thread, NULL);
-END:
-    // Cancel contexts
-    CancelContext(background_thread_ctx);
-    CancelContext(pull_rtsp_thread_ctx);
-    CancelContext(video_renderer_thread_ctx);
-    CancelContext(detection_thread_ctx);
-    // Destroy threads
-    pthread_cond_destroy(&background_thread_ctx->cond);
-    pthread_mutex_destroy(&pull_rtsp_thread_ctx->mtx);
-    pthread_mutex_destroy(&video_renderer_thread_ctx->mtx);
-    pthread_mutex_destroy(&detection_thread_ctx->mtx);
-    // Free frame queues
-    frame_queue_destroy(&video_queue);
-    frame_queue_destroy(&box_queue);
-    frame_queue_destroy(&detection_queue);
-    frame_queue_destroy(&origin_frame_queue);
-    frame_queue_destroy(&infer_frame_queue);
+
+    // 分离线程
+    for (int i = 1; i < 4; i++)
+    {
+        pthread_detach(threads[i]);
+    }
+
+    // 等待后台线程结束
+    pthread_join(threads[0], NULL);
+
+    // 清理资源
+    destroy_contexts();
+    destroy_frame_queues(queues, 6);
 
     return EXIT_SUCCESS;
 }
