@@ -26,7 +26,7 @@ extern "C"
 #include "frame_queue.h"
 #include "rtsp_handler.h"
 #include "libav_utils.h"
-
+#include "push_stream_thread.h"
 void *pull_rtsp_handler_thread(void *arg)
 {
     const ThreadArgs *args = (ThreadArgs *)arg;
@@ -134,7 +134,18 @@ void *pull_rtsp_handler_thread(void *arg)
         printf("  codec_name: %s\n", avcodec_get_name(stream->codecpar->codec_id));
     }
     fprintf(stderr, "RTSP handler thread started. Pull stream: %s\n", args->input_stream_url);
-
+    Context *push_rtsp_thread_ctx;
+    push_rtsp_thread_ctx = CreateContext();
+    ThreadArgs push_rtsp_thread_args = *args;
+    pthread_t push_rtsp_thread;
+    // 复制上下文的参数
+    push_rtsp_thread_args.input_stream_codecpar = fmt_ctx->streams[video_stream_index]->codecpar;
+    if (pthread_create(&push_rtsp_thread, NULL, push_rtmp_handler_thread, (void *)&push_rtsp_thread_args) != 0)
+    {
+        fprintf(stderr, "Failed to create RTSP thread");
+        return NULL;
+    }
+    pthread_detach(push_rtsp_thread);
     // Read frames from the stream
     while (av_read_frame(fmt_ctx, origin_packet) >= 0)
     {
@@ -225,6 +236,9 @@ void *pull_rtsp_handler_thread(void *arg)
     }
 
 END:
+    fprintf(stderr, "RTSP handler thread stopped. Pull stream: %s\n", args->input_stream_url);
+    CancelContext(push_rtsp_thread_ctx);
+    pthread_mutex_destroy(&push_rtsp_thread_ctx->mtx);
     avcodec_free_context(&codec_ctx);
     av_packet_free(&origin_packet);
     avformat_close_input(&fmt_ctx);

@@ -27,10 +27,10 @@ typedef struct
     FrameQueue *box_queue;
     FrameQueue *origin_frame_queue;
     FrameQueue *infer_frame_queue;
-    AVStream *input_stream;  // 输入流
-    AVStream *output_stream; // 输出流
+    AVCodecParameters *input_stream_codecpar;
     Context *ctx;
 
 } ThreadArgs;
 
+void dump_thread_args(ThreadArgs *args);
 #endif

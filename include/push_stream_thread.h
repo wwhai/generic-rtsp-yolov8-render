@@ -38,6 +38,7 @@ typedef struct
     AVFormatContext *output_ctx;
     AVStream *video_stream;
     AVCodecContext *codec_ctx;
+    AVCodecParameters *input_stream_codecpar;
 } RtmpStreamContext;
 
 /// @brief

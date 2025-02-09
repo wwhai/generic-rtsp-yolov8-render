@@ -17,7 +17,3 @@ set -x
 gcc -Wall -O2 -Iinclude ./ffmpeg_streaming.c -o ffmpeg_streaming -lpthread \
  `pkg-config --libs libavformat libavcodec libavutil libswscale sdl2 ` \
  `pkg-config --cflags libavformat libavcodec libavutil libswscale sdl2`
-
-gcc -Wall -O2 -Iinclude ./codec.c -o codec -lpthread \
- `pkg-config --libs libavformat libavcodec libavutil libswscale sdl2 ` \
- `pkg-config --cflags libavformat libavcodec libavutil libswscale sdl2`

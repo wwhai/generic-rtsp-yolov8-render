@@ -104,7 +104,7 @@ int init_rtmp_stream(RtmpStreamContext *ctx, const char *output_url, int width, 
     return 0;
 }
 
-// 优化后的push_stream函数
+// 优化后的 push_stream 函数
 void push_stream(RtmpStreamContext *ctx, AVFrame *frame)
 {
     if (!ctx || !frame)
@@ -120,14 +120,14 @@ void push_stream(RtmpStreamContext *ctx, AVFrame *frame)
         fprintf(stderr, "Error sending frame: %s\n", get_av_error(ret));
         return;
     }
-
     AVPacket *pkt = av_packet_alloc();
     if (!pkt)
     {
         fprintf(stderr, "Error allocating AVPacket\n");
         return;
     }
-
+    static int64_t last_dts = -1; // 用于记录上一个 DTS
+    static int64_t last_pts = -1; // 用于记录上一个 PTS
     // 接收编码后的数据包
     while (1)
     {
@@ -147,22 +147,37 @@ void push_stream(RtmpStreamContext *ctx, AVFrame *frame)
         fprintf(stderr, "Codec time base: %d/%d\n", ctx->codec_ctx->time_base.num, ctx->codec_ctx->time_base.den);
         fprintf(stderr, "Video stream time base: %d/%d\n", ctx->video_stream->time_base.num, ctx->video_stream->time_base.den);
         fprintf(stderr, "BEFORE ====== PTS: %ld, DTS: %ld, Duration: %ld\n", pkt->pts, pkt->dts, pkt->duration);
-
         // 调整时间戳
-        pkt->pts = av_rescale_q_rnd(pkt->pts, ctx->codec_ctx->time_base, ctx->video_stream->time_base, (AVRounding)(AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX));
-        pkt->dts = av_rescale_q_rnd(pkt->dts, ctx->codec_ctx->time_base, ctx->video_stream->time_base, (AVRounding)(AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX));
+        if (pkt->pts != AV_NOPTS_VALUE)
+        {
+            pkt->pts = av_rescale_q_rnd(pkt->pts, ctx->codec_ctx->time_base, ctx->video_stream->time_base, (AVRounding)(AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX));
+        }
+        if (pkt->dts != AV_NOPTS_VALUE)
+        {
+            pkt->dts = av_rescale_q_rnd(pkt->dts, ctx->codec_ctx->time_base, ctx->video_stream->time_base, (AVRounding)(AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX));
+        }
         int fps = 25;
         AVRational codec_time_base = ctx->codec_ctx->time_base;
         pkt->duration = av_rescale_q(1, (AVRational){1, fps}, codec_time_base);
         pkt->pos = -1;
         pkt->stream_index = ctx->video_stream->index;
-
+        // 确保 DTS 和 PTS 单调递增
+        if (last_dts != -1 && (pkt->dts == AV_NOPTS_VALUE || pkt->dts <= last_dts))
+        {
+            pkt->dts = last_dts + pkt->duration;
+        }
+        if (last_pts != -1 && (pkt->pts == AV_NOPTS_VALUE || pkt->pts <= last_pts))
+        {
+            pkt->pts = last_pts + pkt->duration;
+        }
+        last_dts = pkt->dts;
+        last_pts = pkt->pts;
         fprintf(stderr, "AFTER ====== PTS: %ld, DTS: %ld, Duration: %ld\n", pkt->pts, pkt->dts, pkt->duration);
-
         // 检查数据包大小
         if (pkt->size <= 0)
         {
             fprintf(stderr, "Packet size is invalid: %d\n", pkt->size);
+            av_packet_free(&pkt);
             return;
         }
         ret = av_interleaved_write_frame(ctx->output_ctx, pkt);
@@ -170,11 +185,9 @@ void push_stream(RtmpStreamContext *ctx, AVFrame *frame)
         {
             fprintf(stderr, "Error writing packet: %d, %s\n", ret, get_av_error(ret));
         }
-
         // 释放数据包
         av_packet_unref(pkt);
     }
-
     av_packet_free(&pkt);
 }
 
@@ -182,13 +195,12 @@ void push_stream(RtmpStreamContext *ctx, AVFrame *frame)
 void *push_rtmp_handler_thread(void *arg)
 {
     ThreadArgs *args = (ThreadArgs *)arg;
-    const char *output_url = "rtmp://192.168.10.8:1935/live/tlive001";
 
     RtmpStreamContext ctx;
     memset(&ctx, 0, sizeof(RtmpStreamContext));
 
     // 初始化输出流
-    if (init_rtmp_stream(&ctx, output_url, 1920, 1080, 25) < 0)
+    if (init_rtmp_stream(&ctx, args->output_stream_url, 1920, 1080, 25) < 0)
     {
         fprintf(stderr, "Failed to initialize RTMP stream\n");
         return NULL;
