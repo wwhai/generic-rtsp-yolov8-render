@@ -34,9 +34,9 @@ void *pull_rtsp_handler_thread(void *arg)
     int ret;
 
     // Open RTSP input stream
-    if ((ret = avformat_open_input(&fmt_ctx, args->rtsp_url, NULL, NULL)) < 0)
+    if ((ret = avformat_open_input(&fmt_ctx, args->input_stream_url, NULL, NULL)) < 0)
     {
-        fprintf(stderr, "Error: Could not open RTSP stream :(%s).\n", args->rtsp_url);
+        fprintf(stderr, "Error: Could not open RTSP stream :(%s).\n", args->input_stream_url);
         pthread_exit(NULL);
     }
 
@@ -66,7 +66,7 @@ void *pull_rtsp_handler_thread(void *arg)
     }
 
     // Print stream information
-    av_dump_format(fmt_ctx, 0, args->rtsp_url, 0);
+    av_dump_format(fmt_ctx, 0, args->input_stream_url, 0);
 
     // Allocate AVPacket for reading frames
     AVPacket *origin_packet = av_packet_alloc();
@@ -133,7 +133,7 @@ void *pull_rtsp_handler_thread(void *arg)
         printf("  codec_type: %s\n", av_get_media_type_string(stream->codecpar->codec_type));
         printf("  codec_name: %s\n", avcodec_get_name(stream->codecpar->codec_id));
     }
-    fprintf(stderr, "RTSP handler thread started. Pull stream: %s\n", args->rtsp_url);
+    fprintf(stderr, "RTSP handler thread started. Pull stream: %s\n", args->input_stream_url);
 
     // Read frames from the stream
     while (av_read_frame(fmt_ctx, origin_packet) >= 0)
@@ -186,7 +186,7 @@ void *pull_rtsp_handler_thread(void *arg)
             else
             {
                 {
-                    AVFrame *display_frame = CopyAVFrame(origin_frame);
+                    AVFrame *display_frame = av_frame_clone(origin_frame);
                     QueueItem outputItem;
                     outputItem.type = ONLY_FRAME;
                     outputItem.data = display_frame;
@@ -197,7 +197,7 @@ void *pull_rtsp_handler_thread(void *arg)
                     }
                 }
                 {
-                    AVFrame *output_frame = CopyAVFrame(origin_frame);
+                    AVFrame *output_frame = av_frame_clone(origin_frame);
                     QueueItem outputItem;
                     outputItem.type = ONLY_FRAME;
                     outputItem.data = output_frame;
@@ -208,7 +208,7 @@ void *pull_rtsp_handler_thread(void *arg)
                     }
                 }
                 {
-                    AVFrame *detection_frame = CopyAVFrame(origin_frame);
+                    AVFrame *detection_frame = av_frame_clone(origin_frame);
                     QueueItem outputItem;
                     outputItem.type = ONLY_FRAME;
                     outputItem.data = detection_frame;

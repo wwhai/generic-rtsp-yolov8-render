@@ -20,12 +20,15 @@
 
 typedef struct
 {
-    const char *rtsp_url;
+    const char *input_stream_url;
+    const char *output_stream_url;
     FrameQueue *video_queue;
     FrameQueue *detection_queue;
     FrameQueue *box_queue;
     FrameQueue *origin_frame_queue;
     FrameQueue *infer_frame_queue;
+    AVStream *input_stream;  // 输入流
+    AVStream *output_stream; // 输出流
     Context *ctx;
 
 } ThreadArgs;
