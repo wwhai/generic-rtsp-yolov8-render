@@ -155,7 +155,7 @@ void save_mp4(Mp4StreamContext *ctx, AVFrame *frame)
             fprintf(stderr, "Error encoding frame: %s\n", get_av_error(ret));
             break;
         }
-        av_packet_rescale_ts(pkt, ctx->codec_ctx->time_base, ctx->video_stream->time_base);
+        av_packet_rescale_ts(pkt, ctx->input_stream->time_base, ctx->video_stream->time_base);
 
         ret = av_interleaved_write_frame(ctx->output_ctx, pkt);
         if (ret < 0)
@@ -176,7 +176,9 @@ void *save_mp4_handler_thread(void *arg)
     Mp4StreamContext ctx;
     memset(&ctx, 0, sizeof(Mp4StreamContext));
     ctx.input_stream_codecpar = args->input_stream_codecpar;
+    ctx.input_stream = args->input_stream;
     // 初始化输出流
+    fprintf(stderr, "Start save mp4 record thread\n");
     if (init_mp4_stream(&ctx, "./local.mp4", 1920, 1080, 25) < 0)
     {
         fprintf(stderr, "Failed to initialize RTMP stream\n");

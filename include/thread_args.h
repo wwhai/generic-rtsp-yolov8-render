@@ -28,6 +28,7 @@ typedef struct
     FrameQueue *origin_frame_queue;
     FrameQueue *record_frame_queue;
     FrameQueue *infer_frame_queue;
+    AVStream *input_stream;
     AVCodecParameters *input_stream_codecpar;
     Context *ctx;
 

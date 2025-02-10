@@ -138,9 +138,6 @@ void push_stream(RtmpStreamContext *ctx, AVFrame *frame)
         fprintf(stderr, "Error allocating AVPacket\n");
         return;
     }
-    static int64_t last_dts = -1; // 用于记录上一个 DTS
-    static int64_t last_pts = -1; // 用于记录上一个 PTS
-    static int frame_count = 0;   // 记录处理的帧数
     // 接收编码后的数据包
     while (1)
     {
@@ -155,49 +152,8 @@ void push_stream(RtmpStreamContext *ctx, AVFrame *frame)
             fprintf(stderr, "Error encoding frame: %s\n", get_av_error(ret));
             break;
         }
-        // 调整时间戳
-        if (pkt->pts != AV_NOPTS_VALUE)
-        {
-            pkt->pts = av_rescale_q_rnd(pkt->pts, ctx->codec_ctx->time_base,
-                                        ctx->video_stream->time_base,
-                                        (AVRounding)(AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX));
-        }
-        if (pkt->dts != AV_NOPTS_VALUE)
-        {
-            pkt->dts = av_rescale_q_rnd(pkt->dts, ctx->codec_ctx->time_base,
-                                        ctx->video_stream->time_base,
-                                        (AVRounding)(AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX));
-        }
-        int fps = 25;
-        AVRational codec_time_base = ctx->codec_ctx->time_base;
-        pkt->duration = av_rescale_q(1, (AVRational){1, fps}, codec_time_base);
-        pkt->pos = -1;
-        pkt->stream_index = ctx->video_stream->index;
-        // 确保 DTS 和 PTS 单调递增
-        if (last_dts != -1 && (pkt->dts == AV_NOPTS_VALUE || pkt->dts <= last_dts))
-        {
-            pkt->dts = last_dts + pkt->duration;
-        }
-        if (last_pts != -1 && (pkt->pts == AV_NOPTS_VALUE || pkt->pts <= last_pts))
-        {
-            pkt->pts = last_pts + pkt->duration;
-        }
-        last_dts = pkt->dts;
-        last_pts = pkt->pts;
-        frame_count++;
-        if (frame_count >= 1000000)
-        {
-            last_dts = -1;
-            last_pts = -1;
-            frame_count = 0;
-        }
-        // 检查数据包大小
-        if (pkt->size <= 0)
-        {
-            fprintf(stderr, "Packet size is invalid: %d\n", pkt->size);
-            av_packet_free(&pkt);
-            return;
-        }
+
+        av_packet_rescale_ts(pkt, ctx->input_stream->time_base, ctx->video_stream->time_base);
         ret = av_interleaved_write_frame(ctx->output_ctx, pkt);
         if (ret < 0)
         {
@@ -217,6 +173,7 @@ void *push_rtmp_handler_thread(void *arg)
     RtmpStreamContext ctx;
     memset(&ctx, 0, sizeof(RtmpStreamContext));
     ctx.input_stream_codecpar = args->input_stream_codecpar;
+    ctx.input_stream = args->input_stream;
     // 初始化输出流
     if (init_rtmp_stream(&ctx, args->output_stream_url, 1920, 1080, 25) < 0)
     {

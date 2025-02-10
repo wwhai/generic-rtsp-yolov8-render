@@ -130,7 +130,7 @@ int main(int argc, char *argv[])
     // 创建线程参数
     ThreadArgs background_thread_args = {.ctx = contexts[0]};
     ThreadArgs common_args = {pull_from_rtsp_url, push_to_rtsp_url, &queues[0], &queues[1], &queues[2],
-                              &queues[3], &queues[4], &queues[5], NULL, contexts[1]};
+                              &queues[3], &queues[4], &queues[5], NULL, NULL, contexts[1]};
 
     // 创建线程
     pthread_t threads[4];
