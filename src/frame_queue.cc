@@ -13,6 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include "frame_queue.h"
+void free_queue_node(QueueItem *item)
+{
+    if (item != NULL)
+    {
+        if (item->data != NULL)
+        {
+            AVFrame *frame = (AVFrame *)item->data;
+            av_frame_free(&frame);
+        }
+        free(item);
+    }
+}
 // 初始化队列
 void frame_queue_init(FrameQueue *q, int max_size)
 {

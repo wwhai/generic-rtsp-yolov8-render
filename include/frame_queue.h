@@ -47,7 +47,8 @@ typedef struct QueueItem
     int box_count;
     Box Boxes[20];
 } QueueItem;
-
+// 释放队列节点
+void free_queue_node(QueueItem *item);
 // 队列节点结构体
 typedef struct QueueNode
 {

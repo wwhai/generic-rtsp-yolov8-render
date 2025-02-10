@@ -1,7 +1,7 @@
 # Compiler and flags
 CC = g++
-CFLAGS = -Wall -O2 -I$(INCDIR) `pkg-config --cflags libavformat libavcodec libavutil libswscale sdl2 SDL2_ttf opencv4`
-LDFLAGS = `pkg-config --libs libavformat libavcodec libavutil libswscale sdl2 SDL2_ttf opencv4` -lpthread
+CFLAGS = -Wall -O2 -I$(INCDIR) `pkg-config --cflags libavformat libavcodec libavutil libswscale sdl2 SDL2_ttf opencv4 libcurl libpng`
+LDFLAGS = `pkg-config --libs libavformat libavcodec libavutil libswscale sdl2 SDL2_ttf opencv4 libcurl libpng` -lpthread
 
 # Target executable
 TARGET = generic-rtsp-yolov8-render

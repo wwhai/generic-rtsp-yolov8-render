@@ -14,31 +14,113 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include "libav_utils.h"
 #include "frame_queue.h"
-#include "stdio.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <png.h>
+#include <libavutil/imgutils.h>
+// 保存AVFrame图像到文件，格式为png
 const char *get_av_error(int errnum)
 {
     static char str[AV_ERROR_MAX_STRING_SIZE];
     av_strerror(errnum, str, sizeof(str));
     return str;
 }
-
-// 保存图像到文件,格式为png，不要用Libav的库，直接提取Avframe的Data
+// 保存AVFrame图像到文件，格式为png
 int CaptureImage(AVFrame *srcFrame, const char *file_path)
 {
     if (!srcFrame || !file_path)
     {
-        fprintf(stderr, "Invalid input parameters\n");
         return -1;
     }
-    FILE *file = fopen(file_path, "wb");
-    if (!file)
+    FILE *fp = fopen(file_path, "wb");
+    if (!fp)
     {
-        fprintf(stderr, "Could not open file: %s\n", file_path);
-        return -1;
+        return -2;
     }
-    // 写入文件头
-    fwrite(srcFrame->data[0], 1, srcFrame->linesize[0] * srcFrame->height, file);
-    fclose(file);
+    png_structp png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+    if (!png_ptr)
+    {
+        fclose(fp);
+        return -3;
+    }
+    png_infop info_ptr = png_create_info_struct(png_ptr);
+    if (!info_ptr)
+    {
+        png_destroy_write_struct(&png_ptr, NULL);
+        fclose(fp);
+        return -4;
+    }
+    if (setjmp(png_jmpbuf(png_ptr)))
+    {
+        png_destroy_write_struct(&png_ptr, &info_ptr);
+        fclose(fp);
+        return -5;
+    }
+    png_init_io(png_ptr, fp);
+    int width = srcFrame->width;
+    int height = srcFrame->height;
+    // int pixel_format = srcFrame->format;
+    // 假设输入的是YUV420P格式，这里转换为RGB24
+    uint8_t *rgb_data = (uint8_t *)malloc(width * height * 3);
+    if (!rgb_data)
+    {
+        png_destroy_write_struct(&png_ptr, &info_ptr);
+        fclose(fp);
+        return -6;
+    }
+    for (int y = 0; y < height; y++)
+    {
+        for (int x = 0; x < width; x++)
+        {
+            int index_y = y * width + x;
+            int index_u = (y / 2) * (width / 2) + (x / 2);
+            int index_v = (y / 2) * (width / 2) + (x / 2);
+            int Y = srcFrame->data[0][index_y];
+            int U = srcFrame->data[1][index_u] - 128;
+            int V = srcFrame->data[2][index_v] - 128;
+            int R = Y + 1.402 * V;
+            int G = Y - 0.344 * U - 0.714 * V;
+            int B = Y + 1.772 * U;
+            R = (R < 0) ? 0 : (R > 255) ? 255
+                                        : R;
+            G = (G < 0) ? 0 : (G > 255) ? 255
+                                        : G;
+            B = (B < 0) ? 0 : (B > 255) ? 255
+                                        : B;
+            int index_rgb = (y * width + x) * 3;
+            rgb_data[index_rgb] = R;
+            rgb_data[index_rgb + 1] = G;
+            rgb_data[index_rgb + 2] = B;
+        }
+    }
+    // 设置PNG文件信息
+    png_set_IHDR(png_ptr, info_ptr, width, height,
+                 8, PNG_COLOR_TYPE_RGB, PNG_INTERLACE_NONE,
+                 PNG_COMPRESSION_TYPE_BASE, PNG_FILTER_TYPE_BASE);
+    // 写入PNG文件头
+    png_write_info(png_ptr, info_ptr);
+    // 准备每行数据的指针数组
+    png_bytep *row_pointers = (png_bytep *)malloc(height * sizeof(png_bytep));
+    if (!row_pointers)
+    {
+        free(rgb_data);
+        png_destroy_write_struct(&png_ptr, &info_ptr);
+        fclose(fp);
+        return -7;
+    }
+    for (int y = 0; y < height; y++)
+    {
+        row_pointers[y] = rgb_data + y * width * 3;
+    }
+    // 写入图像数据
+    png_write_image(png_ptr, row_pointers);
+    // 写入PNG文件尾
+    png_write_end(png_ptr, NULL);
+    // 释放资源
+    free(row_pointers);
+    free(rgb_data);
+    png_destroy_write_struct(&png_ptr, &info_ptr);
+    fclose(fp);
     return 0;
 }
 

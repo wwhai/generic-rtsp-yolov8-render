@@ -32,7 +32,8 @@ make clean
 
 编译成功后，运行以下命令启动程序：
 ```bash
-./generic-rtsp-yolov8-render.exe rtsp://192.168.10.8:554/av0_0
+./generic-rtsp-yolov8-render rtsp://192.168.10.6:554/av0_0 \ 
+                             rtmp://192.168.10.9:1935/live/tlive001
 ```
 
 ### Docker 环境

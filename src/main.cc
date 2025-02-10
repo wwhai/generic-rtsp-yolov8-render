@@ -26,7 +26,7 @@
 #include "background.h"
 #include "context.h"
 #include "push_stream_thread.h"
-
+#include <curl/curl.h>
 // 全局上下文指针数组
 Context *contexts[4];
 
@@ -99,7 +99,7 @@ int main(int argc, char *argv[])
         perror("Failed to set signal handler for SIGTERM");
         return 1;
     }
-
+    curl_global_init(CURL_GLOBAL_ALL);
     const char *pull_from_rtsp_url = argv[1];
     const char *push_to_rtsp_url = argv[2];
 
@@ -158,6 +158,6 @@ int main(int argc, char *argv[])
     // 清理资源
     destroy_contexts();
     destroy_frame_queues(queues, 6);
-
+    curl_global_cleanup();
     return EXIT_SUCCESS;
 }

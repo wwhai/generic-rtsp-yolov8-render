@@ -27,7 +27,7 @@ int init_mp4_stream(Mp4StreamContext *ctx, const char *output_url, int width, in
     fprintf(stderr, "init_rtmp_stream === output_url=%s,width=%d,height=%d,fps=%d\n",
             output_url, width, height, fps);
     // 创建输出上下文
-    int ret = avformat_alloc_output_context2(&ctx->output_ctx, NULL, "mp4", output_url);
+    int ret = avformat_alloc_output_context2(&ctx->output_ctx, NULL, "flv", output_url);
     if (ret < 0 || !ctx->output_ctx)
     {
         fprintf(stderr, "Failed to create output context: %s\n", get_av_error(ret));
@@ -87,6 +87,9 @@ int init_mp4_stream(Mp4StreamContext *ctx, const char *output_url, int width, in
         fprintf(stderr, "Failed to open codec: %s\n", get_av_error(ret));
         goto cleanup_codec_context;
     }
+    fprintf(stderr, "=== av_dump_format output.mp4 === \n");
+    av_dump_format(ctx->output_ctx, 0, "output.mp4", 1);
+    fprintf(stderr, "================================= \n");
     // 打开网络输出
     if (!(ctx->output_ctx->oformat->flags & AVFMT_NOFILE))
     {
@@ -121,7 +124,7 @@ void save_mp4(Mp4StreamContext *ctx, AVFrame *frame)
 {
     if (!ctx || !frame)
     {
-        fprintf(stderr, "Invalid input parameters: Mp4StreamContext or AVFrame is NULL\n");
+        fprintf(stderr, "Invalid input parameters: RtmpStreamContext or AVFrame is NULL\n");
         return;
     }
     int ret = 0;
@@ -153,6 +156,7 @@ void save_mp4(Mp4StreamContext *ctx, AVFrame *frame)
             break;
         }
         av_packet_rescale_ts(pkt, ctx->codec_ctx->time_base, ctx->video_stream->time_base);
+
         ret = av_interleaved_write_frame(ctx->output_ctx, pkt);
         if (ret < 0)
         {
@@ -173,14 +177,14 @@ void *save_mp4_handler_thread(void *arg)
     memset(&ctx, 0, sizeof(Mp4StreamContext));
     ctx.input_stream_codecpar = args->input_stream_codecpar;
     // 初始化输出流
-    if (init_mp4_stream(&ctx, "local.mp4", 1920, 1080, 25) < 0)
+    if (init_mp4_stream(&ctx, "./local.mp4", 1920, 1080, 25) < 0)
     {
         fprintf(stderr, "Failed to initialize RTMP stream\n");
         return NULL;
     }
 
     // Main processing loop
-    while (1)
+    while (!args->ctx->is_cancelled)
     {
         QueueItem item;
         memset(&item, 0, sizeof(QueueItem));
@@ -195,10 +199,11 @@ void *save_mp4_handler_thread(void *arg)
             }
         }
     }
-
+    // 清理资源
+    fprintf(stderr, "Stop save mp4 record thread\n");
     av_write_trailer(ctx.output_ctx);
-    avcodec_free_context(&ctx.codec_ctx);
     avio_closep(&ctx.output_ctx->pb);
+    avcodec_free_context(&ctx.codec_ctx);
     avformat_free_context(ctx.output_ctx);
     return NULL;
 }

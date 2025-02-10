@@ -158,11 +158,15 @@ void push_stream(RtmpStreamContext *ctx, AVFrame *frame)
         // 调整时间戳
         if (pkt->pts != AV_NOPTS_VALUE)
         {
-            pkt->pts = av_rescale_q_rnd(pkt->pts, ctx->codec_ctx->time_base, ctx->video_stream->time_base, (AVRounding)(AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX));
+            pkt->pts = av_rescale_q_rnd(pkt->pts, ctx->codec_ctx->time_base,
+                                        ctx->video_stream->time_base,
+                                        (AVRounding)(AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX));
         }
         if (pkt->dts != AV_NOPTS_VALUE)
         {
-            pkt->dts = av_rescale_q_rnd(pkt->dts, ctx->codec_ctx->time_base, ctx->video_stream->time_base, (AVRounding)(AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX));
+            pkt->dts = av_rescale_q_rnd(pkt->dts, ctx->codec_ctx->time_base,
+                                        ctx->video_stream->time_base,
+                                        (AVRounding)(AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX));
         }
         int fps = 25;
         AVRational codec_time_base = ctx->codec_ctx->time_base;

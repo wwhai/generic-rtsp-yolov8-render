@@ -70,3 +70,5 @@ compile_commands.json
 node_modules/
 package-lock.json
 yarn.lock
+*.mp4
+*.flv
