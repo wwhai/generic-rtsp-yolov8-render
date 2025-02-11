@@ -41,7 +41,6 @@ typedef struct
     AVStream *video_stream;
     AVCodecContext *codec_ctx;
     AVStream *input_stream;
-    AVCodecParameters *input_stream_codecpar;
 } Mp4StreamContext;
 
 /// @brief

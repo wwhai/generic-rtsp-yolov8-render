@@ -48,9 +48,9 @@ int init_rtmp_stream(RtmpStreamContext *ctx, const char *output_url, int width, 
         goto cleanup_output_context;
     }
     // 从输入流复制编解码器参数到编码器上下文
-    if (ctx->input_stream_codecpar)
+    if (ctx->input_stream->codecpar)
     {
-        ret = avcodec_parameters_to_context(ctx->codec_ctx, ctx->input_stream_codecpar);
+        ret = avcodec_parameters_to_context(ctx->codec_ctx, ctx->input_stream->codecpar);
         if (ret < 0)
         {
             fprintf(stdout, "Failed to copy codec parameters from input stream: %s\n", get_av_error(ret));
@@ -172,7 +172,6 @@ void *push_rtmp_handler_thread(void *arg)
 
     RtmpStreamContext ctx;
     memset(&ctx, 0, sizeof(RtmpStreamContext));
-    ctx.input_stream_codecpar = args->input_stream_codecpar;
     ctx.input_stream = args->input_stream;
     // 初始化输出流
     if (init_rtmp_stream(&ctx, args->output_stream_url, 1920, 1080, 25) < 0)

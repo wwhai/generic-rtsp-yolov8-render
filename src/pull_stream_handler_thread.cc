@@ -170,7 +170,6 @@ void *pull_stream_handler_thread(void *arg)
             avcodec_parameters_free(&params);
             return NULL;
         }
-        record_mp4_thread_args.input_stream_codecpar = params;
         if (pthread_create(&record_mp4_thread, NULL, save_mp4_handler_thread, (void *)&record_mp4_thread_args) != 0)
         {
             fprintf(stdout, "Failed to create push_rtmp_handler thread");
@@ -197,7 +196,6 @@ void *pull_stream_handler_thread(void *arg)
             avcodec_parameters_free(&params);
             return NULL;
         }
-        push_stream_thread_args.input_stream_codecpar = params;
         if (pthread_create(&push_stream_thread, NULL, push_rtmp_handler_thread, (void *)&push_stream_thread_args) != 0)
         {
             fprintf(stdout, "Failed to create Stream thread");
