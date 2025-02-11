@@ -17,7 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
-#include "pull_rtsp_handler_thread.h"
+#include "pull_camera_handler_thread.h"
 #include "frame_queue.h"
 #include "video_renderer.h"
 #include "detection_thread.h"
@@ -89,7 +89,7 @@ int main(int argc, char *argv[])
 {
     if (argc < 3)
     {
-        fprintf(stderr, "Usage: %s <RTSP_URL> <PUSH_URL>\n", argv[0]);
+        fprintf(stderr, "Usage: %s <camera_URL> <PUSH_URL>\n", argv[0]);
         return 1;
     }
 
@@ -100,8 +100,8 @@ int main(int argc, char *argv[])
         return 1;
     }
     curl_global_init(CURL_GLOBAL_ALL);
-    const char *pull_from_rtsp_url = argv[1];
-    const char *push_to_rtsp_url = argv[2];
+    const char *pull_from_camera_url = argv[1];
+    const char *push_to_camera_url = argv[2];
 
     // 创建上下文
     contexts[0] = CreateContext();
@@ -129,13 +129,13 @@ int main(int argc, char *argv[])
 
     // 创建线程参数
     ThreadArgs background_thread_args = {.ctx = contexts[0]};
-    ThreadArgs common_args = {pull_from_rtsp_url, push_to_rtsp_url, &queues[0], &queues[1], &queues[2],
+    ThreadArgs common_args = {pull_from_camera_url, push_to_camera_url, &queues[0], &queues[1], &queues[2],
                               &queues[3], &queues[4], &queues[5], NULL, NULL, contexts[1]};
 
     // 创建线程
     pthread_t threads[4];
     if (create_thread(&threads[0], background_task_thread, &background_thread_args) != 0 ||
-        create_thread(&threads[1], pull_rtsp_handler_thread, &common_args) != 0 ||
+        create_thread(&threads[1], pull_camera_handler_thread, &common_args) != 0 ||
         create_thread(&threads[2], video_renderer_thread, &common_args) != 0 ||
         create_thread(&threads[3], frame_detection_thread, &common_args) != 0)
     {

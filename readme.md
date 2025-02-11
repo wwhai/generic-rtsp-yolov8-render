@@ -31,9 +31,18 @@ make clean
 ### 运行程序
 
 编译成功后，运行以下命令启动程序：
+
+### RTSP
+
 ```bash
-./generic-rtsp-yolov8-render rtsp://192.168.10.6:554/av0_0 \ 
+./generic-rtsp-yolov8-render rtsp://192.168.10.6:554/av0_0 \
                              rtmp://192.168.10.9:1935/live/tlive001
+```
+
+### 摄像头
+```sh
+ffmpeg -list_devices true -f dshow -i dummy
+./generic-rtsp-yolov8-render "1080P USB Camera"  "rtmp://192.168.10.9:1935/live/tlive001"
 ```
 
 ### Docker 环境
