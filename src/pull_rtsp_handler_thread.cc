@@ -24,7 +24,7 @@ extern "C"
 #include <libavutil/pixdesc.h>
 }
 #include "frame_queue.h"
-#include "rtsp_handler.h"
+#include "pull_rtsp_handler_thread.h"
 #include "libav_utils.h"
 #include "push_stream_thread.h"
 #include "video_record_thread.h"
