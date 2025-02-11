@@ -16,7 +16,7 @@
 #include "thread_args.h"
 void dump_thread_args(ThreadArgs *args)
 {
-    fprintf(stderr, "=== dump_thread_args ===\n");
-    fprintf(stderr, "input_stream_url=%s\n", args->input_stream_url);
-    fprintf(stderr, "output_stream_url=%s\n", args->output_stream_url);
+    fprintf(stdout, "=== dump_thread_args ===\n");
+    fprintf(stdout, "input_stream_url=%s\n", args->input_stream_url);
+    fprintf(stdout, "output_stream_url=%s\n", args->output_stream_url);
 }

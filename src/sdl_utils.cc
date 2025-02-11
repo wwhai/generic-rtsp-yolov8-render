@@ -59,7 +59,7 @@ void SDLDisplayNV12Frame(SDL_Renderer *renderer, SDL_Texture *texture, AVFrame *
         frame->width <= 0 ||
         frame->height <= 0)
     {
-        fprintf(stderr, "frame is null or invalid\n");
+        fprintf(stdout, "frame is null or invalid\n");
         return;
     }
 
@@ -72,7 +72,7 @@ void SDLDisplayNV12Frame(SDL_Renderer *renderer, SDL_Texture *texture, AVFrame *
     uint8_t *rgb_buffer = (uint8_t *)malloc(width * height * 3);
     if (!rgb_buffer)
     {
-        fprintf(stderr, "Failed to allocate RGB buffer\n");
+        fprintf(stdout, "Failed to allocate RGB buffer\n");
         return;
     }
     // 转换 NV12 为 RGB
@@ -80,7 +80,7 @@ void SDLDisplayNV12Frame(SDL_Renderer *renderer, SDL_Texture *texture, AVFrame *
     // 更新纹理
     if (SDL_UpdateTexture(texture, NULL, rgb_buffer, width * 3) < 0)
     {
-        fprintf(stderr, "Failed to update texture: %s\n", SDL_GetError());
+        fprintf(stdout, "Failed to update texture: %s\n", SDL_GetError());
         free(rgb_buffer);
         return;
     }
@@ -103,14 +103,14 @@ void SDLDrawText(SDL_Renderer *renderer, SDL_Texture *texture, TTF_Font *font, c
     SDL_Surface *textSurface = TTF_RenderText_Solid(font, text, textColor);
     if (textSurface == NULL)
     {
-        fprintf(stderr, "Failed to render text: %s\n", TTF_GetError());
+        fprintf(stdout, "Failed to render text: %s\n", TTF_GetError());
         return;
     }
     // 创建纹理
     SDL_Texture *textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
     if (textTexture == NULL)
     {
-        fprintf(stderr, "Failed to create texture from surface: %s\n", SDL_GetError());
+        fprintf(stdout, "Failed to create texture from surface: %s\n", SDL_GetError());
         SDL_FreeSurface(textSurface);
         return;
     }

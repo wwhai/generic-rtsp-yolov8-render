@@ -102,12 +102,12 @@ void init_coco_names()
 }
 void print_coco_names()
 {
-    fprintf(stderr, "===========coco names============ \n");
+    fprintf(stdout, "===========coco names============ \n");
     for (int i = 0; i < 80; i++)
     {
         printf("  %d => %s\n", i, coco_names[i]);
     }
-    fprintf(stderr, "================================= \n");
+    fprintf(stdout, "================================= \n");
 }
 
 const char *get_coco_name(int id)

@@ -35,8 +35,7 @@ make clean
 ### RTSP
 
 ```bash
-./generic-rtsp-yolov8-render rtsp://192.168.10.6:554/av0_0 \
-                             rtmp://192.168.10.9:1935/live/tlive001
+./generic-rtsp-yolov8-render rtsp://192.168.10.6:554/av0_0 rtmp://192.168.10.9:1935/live/tlive001
 ```
 
 ### 摄像头

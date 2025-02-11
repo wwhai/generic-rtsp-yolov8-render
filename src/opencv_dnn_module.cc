@@ -48,7 +48,7 @@ int Infer_CV_ONNX_DNN_Yolov8(cv::dnn::Net *net, cv::Mat frame, std::vector<Box> 
 {
     if (!net)
     {
-        fprintf(stderr, "Error: Net pointer is null.\n");
+        fprintf(stdout, "Error: Net pointer is null.\n");
         return -1;
     }
     // 准备输入; YOLOV8图片尺寸需要压缩为640*640
@@ -66,7 +66,7 @@ int Infer_CV_ONNX_DNN_Yolov8(cv::dnn::Net *net, cv::Mat frame, std::vector<Box> 
     // 检查推理结果
     if (outs.empty())
     {
-        fprintf(stderr, "Error: No output from the network.\n");
+        fprintf(stdout, "Error: No output from the network.\n");
         return -1;
     }
     std::vector<DnnResult> results = postprocess(frame, outs, 0.25, 0.5);
@@ -107,7 +107,7 @@ int Release_CV_ONNX_DNN_Yolov8(cv::dnn::Net *net)
     }
     catch (const std::exception &e)
     {
-        fprintf(stderr, "Exception during model release: %s\n", e.what());
+        fprintf(stdout, "Exception during model release: %s\n", e.what());
         return -1;
     }
 }

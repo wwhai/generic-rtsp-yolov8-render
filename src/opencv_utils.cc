@@ -47,7 +47,7 @@ cv::Mat AVFrameToCVMat(AVFrame *frame)
     }
     else
     {
-        fprintf(stderr, "Unsupported pixel format: %s\n", av_get_pix_fmt_name(pix_fmt));
+        fprintf(stdout, "Unsupported pixel format: %s\n", av_get_pix_fmt_name(pix_fmt));
         return cv::Mat();
     }
 

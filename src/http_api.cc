@@ -19,7 +19,7 @@
 size_t write_callback(void *contents, size_t size, size_t nmemb, void *userp)
 {
     size_t realsize = size * nmemb;
-    fprintf(stderr, "=== http write callback === %.*s\n", (int)realsize, (char *)contents);
+    fprintf(stdout, "=== http write callback === %.*s\n", (int)realsize, (char *)contents);
     return realsize;
 }
 void post_recognized_type(const char *url, int type, const char *device_uuid)
@@ -35,7 +35,7 @@ void post_recognized_type(const char *url, int type, const char *device_uuid)
     // 构建 JSON 数据
     snprintf(json_body, sizeof(json_body), "{\"type\": %d, \"ts\": \"%s\", \"device_uuid\": \"%s\"}", type, ts, device_uuid);
     // 输出JSON
-    fprintf(stderr, "====== post_recognized_type json_body ======\n");
-    fprintf(stderr, "POST: %s, Body: %s\n", url, json_body);
-    fprintf(stderr, "============================================\n");
+    fprintf(stdout, "====== post_recognized_type json_body ======\n");
+    fprintf(stdout, "POST: %s, Body: %s\n", url, json_body);
+    fprintf(stdout, "============================================\n");
 }

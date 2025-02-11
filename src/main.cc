@@ -40,7 +40,7 @@ void handle_signal(int sig)
             CancelContext(contexts[i]);
         }
     }
-    fprintf(stderr, "Received signal %d, exiting...\n", sig);
+    fprintf(stdout, "Received signal %d, exiting...\n", sig);
     exit(0);
 }
 
@@ -89,7 +89,7 @@ int main(int argc, char *argv[])
 {
     if (argc < 3)
     {
-        fprintf(stderr, "Usage: %s <camera_URL> <PUSH_URL>\n", argv[0]);
+        fprintf(stdout, "Usage: %s <camera_URL> <PUSH_URL>\n", argv[0]);
         return 1;
     }
 
@@ -114,7 +114,7 @@ int main(int argc, char *argv[])
     {
         if (!contexts[i])
         {
-            fprintf(stderr, "Failed to create context %d\n", i);
+            fprintf(stdout, "Failed to create context %d\n", i);
             destroy_contexts();
             return 1;
         }
@@ -144,7 +144,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    fprintf(stderr, "Main thread waiting for threads to finish...\n");
+    fprintf(stdout, "Main thread waiting for threads to finish...\n");
 
     // 分离线程
     for (int i = 1; i < 4; i++)

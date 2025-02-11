@@ -139,7 +139,7 @@ int RecordAVFrameToMP4(const char *output_file, AVFrame *frames[], int num_frame
 {
     if (!output_file || !frames || num_frames <= 0 || width <= 0 || height <= 0 || fps <= 0)
     {
-        fprintf(stderr, "Invalid input parameters\n");
+        fprintf(stdout, "Invalid input parameters\n");
         return -1;
     }
 
@@ -156,7 +156,7 @@ int RecordAVFrameToMP4(const char *output_file, AVFrame *frames[], int num_frame
     {
         char buffer[64] = {0};
         char *error = av_make_error_string(buffer, 64, ret);
-        fprintf(stderr, "Could not allocate format context: %s\n", error);
+        fprintf(stdout, "Could not allocate format context: %s\n", error);
         return -1;
     }
 
@@ -164,7 +164,7 @@ int RecordAVFrameToMP4(const char *output_file, AVFrame *frames[], int num_frame
     codec = avcodec_find_encoder(AV_CODEC_ID_H264);
     if (!codec)
     {
-        fprintf(stderr, "H.264 codec not found\n");
+        fprintf(stdout, "H.264 codec not found\n");
         ret = -1;
         goto cleanup;
     }
@@ -173,7 +173,7 @@ int RecordAVFrameToMP4(const char *output_file, AVFrame *frames[], int num_frame
     video_stream = avformat_new_stream(format_ctx, codec);
     if (!video_stream)
     {
-        fprintf(stderr, "Could not create video stream\n");
+        fprintf(stdout, "Could not create video stream\n");
         ret = -1;
         goto cleanup;
     }
@@ -183,7 +183,7 @@ int RecordAVFrameToMP4(const char *output_file, AVFrame *frames[], int num_frame
     codec_ctx = avcodec_alloc_context3(codec);
     if (!codec_ctx)
     {
-        fprintf(stderr, "Could not allocate codec context\n");
+        fprintf(stdout, "Could not allocate codec context\n");
         ret = -1;
         goto cleanup;
     }
@@ -210,7 +210,7 @@ int RecordAVFrameToMP4(const char *output_file, AVFrame *frames[], int num_frame
     {
         char buffer[64] = {0};
         char *error = av_make_error_string(buffer, 64, ret);
-        fprintf(stderr, "Could not open codec: %s\n", error);
+        fprintf(stdout, "Could not open codec: %s\n", error);
         goto cleanup;
     }
 
@@ -220,7 +220,7 @@ int RecordAVFrameToMP4(const char *output_file, AVFrame *frames[], int num_frame
     {
         char buffer[64] = {0};
         char *error = av_make_error_string(buffer, 64, ret);
-        fprintf(stderr, "Could not copy codec parameters: %s\n", error);
+        fprintf(stdout, "Could not copy codec parameters: %s\n", error);
         goto cleanup;
     }
 
@@ -231,7 +231,7 @@ int RecordAVFrameToMP4(const char *output_file, AVFrame *frames[], int num_frame
         {
             char buffer[64] = {0};
             char *error = av_make_error_string(buffer, 64, ret);
-            fprintf(stderr, "Could not open output file: %s\n", error);
+            fprintf(stdout, "Could not open output file: %s\n", error);
             goto cleanup;
         }
     }
@@ -241,7 +241,7 @@ int RecordAVFrameToMP4(const char *output_file, AVFrame *frames[], int num_frame
     {
         char buffer[64] = {0};
         char *error = av_make_error_string(buffer, 64, ret);
-        fprintf(stderr, "Error writing header: %s\n", error);
+        fprintf(stdout, "Error writing header: %s\n", error);
         goto cleanup;
     }
 
@@ -256,7 +256,7 @@ int RecordAVFrameToMP4(const char *output_file, AVFrame *frames[], int num_frame
         {
             char buffer[64] = {0};
             char *error = av_make_error_string(buffer, 64, ret);
-            fprintf(stderr, "Error sending frame to encoder: %s\n", error);
+            fprintf(stdout, "Error sending frame to encoder: %s\n", error);
             goto cleanup;
         }
 
@@ -272,7 +272,7 @@ int RecordAVFrameToMP4(const char *output_file, AVFrame *frames[], int num_frame
             {
                 char buffer[64] = {0};
                 char *error = av_make_error_string(buffer, 64, ret);
-                fprintf(stderr, "Error receiving packet from encoder: %s\n", error);
+                fprintf(stdout, "Error receiving packet from encoder: %s\n", error);
                 goto cleanup;
             }
 
@@ -287,7 +287,7 @@ int RecordAVFrameToMP4(const char *output_file, AVFrame *frames[], int num_frame
             {
                 char buffer[64] = {0};
                 char *error = av_make_error_string(buffer, 64, ret);
-                fprintf(stderr, "Error writing packet: %s\n", error);
+                fprintf(stdout, "Error writing packet: %s\n", error);
                 goto cleanup;
             }
         }
@@ -298,7 +298,7 @@ int RecordAVFrameToMP4(const char *output_file, AVFrame *frames[], int num_frame
     {
         char buffer[64] = {0};
         char *error = av_make_error_string(buffer, 64, ret);
-        fprintf(stderr, "Error writing trailer: %s\n", error);
+        fprintf(stdout, "Error writing trailer: %s\n", error);
     }
 
 cleanup:

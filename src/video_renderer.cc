@@ -22,12 +22,12 @@ void *video_renderer_thread(void *arg)
 
     if (SDL_Init(SDL_INIT_EVERYTHING) != 0)
     {
-        fprintf(stderr, "SDL_Init Error: %s\n", SDL_GetError());
+        fprintf(stdout, "SDL_Init Error: %s\n", SDL_GetError());
         return NULL;
     }
     if (TTF_Init() == -1)
     {
-        fprintf(stderr, "SDL_ttf could not initialize! TTF_Error: %s\n", TTF_GetError());
+        fprintf(stdout, "SDL_ttf could not initialize! TTF_Error: %s\n", TTF_GetError());
         SDL_Quit();
         return NULL;
     }
@@ -37,7 +37,7 @@ void *video_renderer_thread(void *arg)
                                           1920, 1080, SDL_WINDOW_SHOWN);
     if (!window)
     {
-        fprintf(stderr, "SDL_CreateWindow Error: %s\n", SDL_GetError());
+        fprintf(stdout, "SDL_CreateWindow Error: %s\n", SDL_GetError());
         SDL_Quit();
         return NULL;
     }
@@ -45,7 +45,7 @@ void *video_renderer_thread(void *arg)
     SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if (!renderer)
     {
-        fprintf(stderr, "SDL_CreateRenderer Error: %s\n", SDL_GetError());
+        fprintf(stdout, "SDL_CreateRenderer Error: %s\n", SDL_GetError());
         SDL_DestroyWindow(window);
         SDL_Quit();
         return NULL;
@@ -56,7 +56,7 @@ void *video_renderer_thread(void *arg)
                                              1920, 1080);
     if (!texture)
     {
-        fprintf(stderr, "SDL_CreateTexture Error: %s\n", SDL_GetError());
+        fprintf(stdout, "SDL_CreateTexture Error: %s\n", SDL_GetError());
         SDL_DestroyRenderer(renderer);
         SDL_DestroyWindow(window);
         SDL_Quit();
@@ -66,7 +66,7 @@ void *video_renderer_thread(void *arg)
     TTF_Font *font = TTF_OpenFont("SourceHanMonoSC-Light.ttf", 18);
     if (font == NULL)
     {
-        fprintf(stderr, "Failed to load font! TTF_Error: %s\n", TTF_GetError());
+        fprintf(stdout, "Failed to load font! TTF_Error: %s\n", TTF_GetError());
         SDL_DestroyRenderer(renderer);
         SDL_DestroyWindow(window);
         TTF_Quit();
@@ -109,7 +109,7 @@ void *video_renderer_thread(void *arg)
                                                newFrame->data[2], newFrame->linesize[2]);
                 if (ret < 0)
                 {
-                    fprintf(stderr, "SDL_UpdateYUVTexture failed: %s\n", SDL_GetError());
+                    fprintf(stdout, "SDL_UpdateYUVTexture failed: %s\n", SDL_GetError());
                 }
                 av_frame_free(&newFrame);
             }
