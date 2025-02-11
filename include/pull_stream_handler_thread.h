@@ -13,10 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef CAMERA_HANDLER_H
-#define CAMERA_HANDLER_H
+#ifndef STREAM_HANDLER_H
+#define STREAM_HANDLER_H
 #include "thread_args.h"
 
-void *pull_camera_handler_thread(void *arg);
+void *pull_stream_handler_thread(void *arg);
 
-#endif // RTSP_HANDLER_H
+#endif // STREAM_HANDLER_H

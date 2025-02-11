@@ -32,7 +32,7 @@ void *video_renderer_thread(void *arg)
         return NULL;
     }
 
-    SDL_Window *window = SDL_CreateWindow("RTSP-VIDEO-PLAYER",
+    SDL_Window *window = SDL_CreateWindow("VIDEO-PLAYER",
                                           SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
                                           1920, 1080, SDL_WINDOW_SHOWN);
     if (!window)
@@ -63,7 +63,7 @@ void *video_renderer_thread(void *arg)
         pthread_exit(NULL);
     }
     // 加载字体
-    TTF_Font *font = TTF_OpenFont("SourceHanMonoSC-Light.ttf", 18);
+    TTF_Font *font = TTF_OpenFont("mono.ttf", 18);
     if (font == NULL)
     {
         fprintf(stdout, "Failed to load font! TTF_Error: %s\n", TTF_GetError());

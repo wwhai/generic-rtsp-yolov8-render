@@ -24,21 +24,21 @@ extern "C"
 #include <libavutil/pixdesc.h>
 }
 #include "frame_queue.h"
-#include "pull_rtsp_handler_thread.h"
+#include "pull_stream_handler_thread.h"
 #include "libav_utils.h"
 #include "push_stream_thread.h"
 #include "video_record_thread.h"
 
-void *pull_rtsp_handler_thread(void *arg)
+void *pull_stream_handler_thread(void *arg)
 {
     const ThreadArgs *args = (ThreadArgs *)arg;
     AVFormatContext *fmt_ctx = NULL;
     int ret;
 
-    // Open RTSP input stream
+    // Open Stream input stream
     if ((ret = avformat_open_input(&fmt_ctx, args->input_stream_url, NULL, NULL)) < 0)
     {
-        fprintf(stdout, "Error: Could not open RTSP stream :(%s).\n", args->input_stream_url);
+        fprintf(stdout, "Error: Could not open Stream stream :(%s).\n", args->input_stream_url);
         pthread_exit(NULL);
     }
 
@@ -150,7 +150,7 @@ void *pull_rtsp_handler_thread(void *arg)
         printf("  codec_name: %s\n", avcodec_get_name(stream->codecpar->codec_id));
         fprintf(stdout, "=========================\n");
     }
-    fprintf(stdout, "RTSP handler thread started. Pull stream: %s\n", args->input_stream_url);
+    fprintf(stdout, "Stream handler thread started. Pull stream: %s\n", args->input_stream_url);
     Context *record_mp4_thread_ctx;
     {
         record_mp4_thread_ctx = CreateContext();
@@ -178,13 +178,13 @@ void *pull_rtsp_handler_thread(void *arg)
         }
         pthread_detach(record_mp4_thread);
     }
-    Context *push_rtsp_thread_ctx;
+    Context *push_stream_thread_ctx;
     {
-        push_rtsp_thread_ctx = CreateContext();
-        ThreadArgs push_rtsp_thread_args = *args;
-        push_rtsp_thread_args.ctx = push_rtsp_thread_ctx;
-        push_rtsp_thread_args.input_stream = fmt_ctx->streams[video_stream_index];
-        pthread_t push_rtsp_thread;
+        push_stream_thread_ctx = CreateContext();
+        ThreadArgs push_stream_thread_args = *args;
+        push_stream_thread_args.ctx = push_stream_thread_ctx;
+        push_stream_thread_args.input_stream = fmt_ctx->streams[video_stream_index];
+        pthread_t push_stream_thread;
         // 复制上下文的参数
         AVCodecParameters *params = avcodec_parameters_alloc();
         if (!params)
@@ -197,13 +197,13 @@ void *pull_rtsp_handler_thread(void *arg)
             avcodec_parameters_free(&params);
             return NULL;
         }
-        push_rtsp_thread_args.input_stream_codecpar = params;
-        if (pthread_create(&push_rtsp_thread, NULL, push_rtmp_handler_thread, (void *)&push_rtsp_thread_args) != 0)
+        push_stream_thread_args.input_stream_codecpar = params;
+        if (pthread_create(&push_stream_thread, NULL, push_rtmp_handler_thread, (void *)&push_stream_thread_args) != 0)
         {
-            fprintf(stdout, "Failed to create RTSP thread");
+            fprintf(stdout, "Failed to create Stream thread");
             return NULL;
         }
-        pthread_detach(push_rtsp_thread);
+        pthread_detach(push_stream_thread);
     }
     // Read frames from the stream
     while (av_read_frame(fmt_ctx, origin_packet) >= 0)
@@ -300,10 +300,10 @@ void *pull_rtsp_handler_thread(void *arg)
     }
 
 END:
-    fprintf(stdout, "RTSP handler thread stopped\n");
-    CancelContext(push_rtsp_thread_ctx);
+    fprintf(stdout, "Stream handler thread stopped\n");
+    CancelContext(push_stream_thread_ctx);
     CancelContext(record_mp4_thread_ctx);
-    pthread_mutex_destroy(&push_rtsp_thread_ctx->mtx);
+    pthread_mutex_destroy(&push_stream_thread_ctx->mtx);
     pthread_mutex_destroy(&record_mp4_thread_ctx->mtx);
     avcodec_free_context(&codec_ctx);
     av_packet_free(&origin_packet);

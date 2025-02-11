@@ -1,6 +1,6 @@
 # 仓库介绍
 
-从 RTSP 流拉取视频并渲染到图形界面，同时对每一帧进行YOLOV8推理，最后融合到视频输出。
+流拉取视频并渲染到图形界面，同时对每一帧进行YOLOV8推理，最后融合到视频输出。
 ![P1](image/readme/1736772995737.png)
 
 ## 环境要求
@@ -35,13 +35,12 @@ make clean
 ### RTSP
 
 ```bash
-./generic-rtsp-yolov8-render rtsp://192.168.10.6:554/av0_0 rtmp://192.168.10.9:1935/live/tlive001
+./generic-stream-yolov8-render rtsp://192.168.10.6:554/av0_0 rtmp://192.168.10.9:1935/live/tlive001
 ```
 
 ### 摄像头
 ```sh
-ffmpeg -list_devices true -f dshow -i dummy
-./generic-rtsp-yolov8-render "1080P USB Camera"  "rtmp://192.168.10.9:1935/live/tlive001"
+./generic-stream-yolov8-render "1080P USB Camera"  "rtmp://192.168.10.9:1935/live/tlive001"
 ```
 
 ### Docker 环境

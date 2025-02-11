@@ -17,7 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
-#include "pull_camera_handler_thread.h"
+#include "pull_stream_handler_thread.h"
 #include "frame_queue.h"
 #include "video_renderer.h"
 #include "detection_thread.h"
@@ -135,7 +135,7 @@ int main(int argc, char *argv[])
     // 创建线程
     pthread_t threads[4];
     if (create_thread(&threads[0], background_task_thread, &background_thread_args) != 0 ||
-        create_thread(&threads[1], pull_camera_handler_thread, &common_args) != 0 ||
+        create_thread(&threads[1], pull_stream_handler_thread, &common_args) != 0 ||
         create_thread(&threads[2], video_renderer_thread, &common_args) != 0 ||
         create_thread(&threads[3], frame_detection_thread, &common_args) != 0)
     {

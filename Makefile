@@ -4,7 +4,7 @@ CFLAGS = -Wall -O2 -I$(INCDIR) `pkg-config --cflags libavformat libavcodec libav
 LDFLAGS = `pkg-config --libs libavformat libavcodec libavutil libswscale sdl2 SDL2_ttf opencv4 libcurl libpng` -lpthread
 
 # Target executable
-TARGET = generic-rtsp-yolov8-render
+TARGET = generic-stream-yolov8-render
 
 # Source and object files
 SRCDIR = src

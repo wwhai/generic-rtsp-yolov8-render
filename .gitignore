@@ -1,5 +1,5 @@
 # Compiled object files
-generic-rtsp-yolov8-render
+generic-stream-yolov8-render
 *.o
 *.ko
 *.obj
