@@ -17,7 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
-#include "rtsp_handler.h"
+#include "pull_rtsp_handler_thread.h"
 #include "frame_queue.h"
 #include "video_renderer.h"
 #include "detection_thread.h"
