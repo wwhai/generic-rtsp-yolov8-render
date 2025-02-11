@@ -34,7 +34,4 @@ void CancelContext(Context *ctx);
 // 检查是否已取消
 int IsCancelled(Context *ctx);
 
-// 工作线程函数
-void *workerFunction(void *arg);
-
 #endif

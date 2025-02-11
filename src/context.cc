@@ -62,21 +62,3 @@ int IsCancelled(Context *ctx)
     pthread_mutex_unlock(&ctx->mtx);
     return result;
 }
-
-// 工作线程函数
-void *workerFunction(void *arg)
-{
-    Context *ctx = (Context *)arg;
-    while (1)
-    {
-        if (IsCancelled(ctx))
-        {
-            printf("Worker is stopping...\n");
-            break;
-        }
-        printf("Worker is running...\n");
-        sleep(1);
-    }
-    pthread_exit(NULL);
-    return (void *)NULL;
-}
