@@ -28,29 +28,55 @@ extern "C"
 #include "libav_utils.h"
 #include "push_stream_thread.h"
 #include "video_record_thread.h"
-
+// 克隆帧并加入队列
+void clone_and_enqueue(AVFrame *src_frame, FrameQueue *queue)
+{
+    AVFrame *output_frame = av_frame_clone(src_frame);
+    QueueItem outputItem;
+    outputItem.type = ONLY_FRAME;
+    outputItem.data = output_frame;
+    memset(outputItem.Boxes, 0, sizeof(outputItem.Boxes));
+    if (!enqueue(queue, outputItem))
+    {
+        av_frame_free(&output_frame);
+    }
+}
+// 自定义错误处理和资源释放函数
+void handle_error(const char *message, int ret, AVFormatContext **fmt_ctx, AVPacket **origin_packet, AVCodecContext **codec_ctx)
+{
+    fprintf(stdout, "%s (%s).\n", message, get_av_error(ret));
+    if (*codec_ctx)
+    {
+        avcodec_free_context(codec_ctx);
+    }
+    if (*origin_packet)
+    {
+        av_packet_free(origin_packet);
+    }
+    if (*fmt_ctx)
+    {
+        avformat_close_input(fmt_ctx);
+    }
+    pthread_exit(NULL);
+}
 void *pull_stream_handler_thread(void *arg)
 {
     const ThreadArgs *args = (ThreadArgs *)arg;
     AVFormatContext *fmt_ctx = NULL;
+    AVPacket *origin_packet = NULL;
+    AVCodecContext *codec_ctx = NULL;
     int ret;
-
     // Open Stream input stream
     if ((ret = avformat_open_input(&fmt_ctx, args->input_stream_url, NULL, NULL)) < 0)
     {
-        fprintf(stdout, "Error: Could not open Stream stream :(%s).\n", args->input_stream_url);
-        pthread_exit(NULL);
+        handle_error("Error: Could not open Stream stream", ret, &fmt_ctx, &origin_packet, &codec_ctx);
     }
-
     // Find stream info
     if ((ret = avformat_find_stream_info(fmt_ctx, NULL)) < 0)
     {
-        fprintf(stdout, "Error: Could not find stream info.\n");
-        avformat_close_input(&fmt_ctx);
-        pthread_exit(NULL);
+        handle_error("Error: Could not find stream info", ret, &fmt_ctx, &origin_packet, &codec_ctx);
     }
-
-    // Find the first video stream
+    // Find the first video and audio streams
     int video_stream_index = -1;
     int audio_stream_index = -1;
     for (unsigned int i = 0; i < fmt_ctx->nb_streams; i++)
@@ -58,84 +84,53 @@ void *pull_stream_handler_thread(void *arg)
         if (fmt_ctx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO)
         {
             video_stream_index = i;
-            break;
         }
-    }
-    for (unsigned int i = 0; i < fmt_ctx->nb_streams; i++)
-    {
-        if (fmt_ctx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO)
+        else if (fmt_ctx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO)
         {
             audio_stream_index = i;
-            break;
         }
     }
     if (audio_stream_index == -1)
     {
-        fprintf(stdout, "Error: No audio stream found.\n");
-        avformat_close_input(&fmt_ctx);
-        pthread_exit(NULL);
+        handle_error("Error: No audio stream found", AVERROR_STREAM_NOT_FOUND, &fmt_ctx, &origin_packet, &codec_ctx);
     }
     if (video_stream_index == -1)
     {
-        fprintf(stdout, "Error: No video stream found.\n");
-        avformat_close_input(&fmt_ctx);
-        pthread_exit(NULL);
+        handle_error("Error: No video stream found", AVERROR_STREAM_NOT_FOUND, &fmt_ctx, &origin_packet, &codec_ctx);
     }
-
     // Print stream information
     fprintf(stdout, "=========input_stream_url======== \n");
     av_dump_format(fmt_ctx, 0, args->input_stream_url, 0);
     fprintf(stdout, "================================= \n");
-
     // Allocate AVPacket for reading frames
-    AVPacket *origin_packet = av_packet_alloc();
+    origin_packet = av_packet_alloc();
     if (!origin_packet)
     {
-        fprintf(stdout, "Error: Could not allocate origin_packet.\n");
-        avformat_close_input(&fmt_ctx);
-        pthread_exit(NULL);
+        handle_error("Error: Could not allocate origin_packet", AVERROR(ENOMEM), &fmt_ctx, &origin_packet, &codec_ctx);
     }
-
     // Get the codec parameters of the video stream
     AVCodecParameters *codecpar = fmt_ctx->streams[video_stream_index]->codecpar;
     // Find the decoder for the video stream
     const AVCodec *decoder = avcodec_find_decoder(codecpar->codec_id);
     if (!decoder)
     {
-        fprintf(stdout, "Error: Failed to find decoder for codec ID %d.\n", codecpar->codec_id);
-        avformat_close_input(&fmt_ctx);
-        av_packet_free(&origin_packet);
-        pthread_exit(NULL);
+        handle_error("Error: Failed to find decoder for codec ID", codecpar->codec_id, &fmt_ctx, &origin_packet, &codec_ctx);
     }
-
     // Allocate a codec context for the decoder
-    AVCodecContext *codec_ctx = avcodec_alloc_context3(decoder);
+    codec_ctx = avcodec_alloc_context3(decoder);
     if (!codec_ctx)
     {
-        fprintf(stdout, "Error: Failed to allocate codec context.\n");
-        avformat_close_input(&fmt_ctx);
-        av_packet_free(&origin_packet);
-        pthread_exit(NULL);
+        handle_error("Error: Failed to allocate codec context", AVERROR(ENOMEM), &fmt_ctx, &origin_packet, &codec_ctx);
     }
-
     // Copy codec parameters to the codec context
     if ((ret = avcodec_parameters_to_context(codec_ctx, codecpar)) < 0)
     {
-        fprintf(stdout, "Error: Failed to copy codec parameters to codec context (%s).\n", get_av_error(ret));
-        avcodec_free_context(&codec_ctx);
-        avformat_close_input(&fmt_ctx);
-        av_packet_free(&origin_packet);
-        pthread_exit(NULL);
+        handle_error("Error: Failed to copy codec parameters to codec context", ret, &fmt_ctx, &origin_packet, &codec_ctx);
     }
-
     // Open the codec
     if ((ret = avcodec_open2(codec_ctx, decoder, NULL)) < 0)
     {
-        fprintf(stdout, "Error: Failed to open codec (%s).\n", get_av_error(ret));
-        avcodec_free_context(&codec_ctx);
-        avformat_close_input(&fmt_ctx);
-        av_packet_free(&origin_packet);
-        pthread_exit(NULL);
+        handle_error("Error: Failed to open codec", ret, &fmt_ctx, &origin_packet, &codec_ctx);
     }
     // 输出详细信息
     for (unsigned int i = 0; i < fmt_ctx->nb_streams; i++)
@@ -151,55 +146,57 @@ void *pull_stream_handler_thread(void *arg)
         fprintf(stdout, "=========================\n");
     }
     fprintf(stdout, "Stream handler thread started. Pull stream: %s\n", args->input_stream_url);
-    Context *record_mp4_thread_ctx;
+    Context *record_mp4_thread_ctx = CreateContext();
+    Context *push_stream_thread_ctx = CreateContext();
+    if (!record_mp4_thread_ctx || !push_stream_thread_ctx)
     {
-        record_mp4_thread_ctx = CreateContext();
+        handle_error("Error: Failed to create context", AVERROR(ENOMEM), &fmt_ctx, &origin_packet, &codec_ctx);
+    }
+    // 启动保存 MP4 的线程
+    {
         ThreadArgs record_mp4_thread_args = *args;
         record_mp4_thread_args.ctx = record_mp4_thread_ctx;
         record_mp4_thread_args.input_stream = fmt_ctx->streams[video_stream_index];
         pthread_t record_mp4_thread;
-        // 复制上下文的参数
         AVCodecParameters *params = avcodec_parameters_alloc();
         if (!params)
         {
-            return NULL;
+            handle_error("Error: Failed to allocate codec parameters", AVERROR(ENOMEM), &fmt_ctx, &origin_packet, &codec_ctx);
         }
         ret = avcodec_parameters_from_context(params, codec_ctx);
         if (ret < 0)
         {
             avcodec_parameters_free(&params);
-            return NULL;
+            handle_error("Error: Failed to copy codec parameters", ret, &fmt_ctx, &origin_packet, &codec_ctx);
         }
         if (pthread_create(&record_mp4_thread, NULL, save_mp4_handler_thread, (void *)&record_mp4_thread_args) != 0)
         {
-            fprintf(stdout, "Failed to create push_rtmp_handler thread");
-            return NULL;
+            avcodec_parameters_free(&params);
+            handle_error("Failed to create save_mp4_handler thread", AVERROR(EAGAIN), &fmt_ctx, &origin_packet, &codec_ctx);
         }
         pthread_detach(record_mp4_thread);
     }
-    Context *push_stream_thread_ctx;
+    // 启动推流的线程
     {
-        push_stream_thread_ctx = CreateContext();
         ThreadArgs push_stream_thread_args = *args;
         push_stream_thread_args.ctx = push_stream_thread_ctx;
         push_stream_thread_args.input_stream = fmt_ctx->streams[video_stream_index];
         pthread_t push_stream_thread;
-        // 复制上下文的参数
         AVCodecParameters *params = avcodec_parameters_alloc();
         if (!params)
         {
-            return NULL;
+            handle_error("Error: Failed to allocate codec parameters", AVERROR(ENOMEM), &fmt_ctx, &origin_packet, &codec_ctx);
         }
         ret = avcodec_parameters_from_context(params, codec_ctx);
         if (ret < 0)
         {
             avcodec_parameters_free(&params);
-            return NULL;
+            handle_error("Error: Failed to copy codec parameters", ret, &fmt_ctx, &origin_packet, &codec_ctx);
         }
         if (pthread_create(&push_stream_thread, NULL, push_rtmp_handler_thread, (void *)&push_stream_thread_args) != 0)
         {
-            fprintf(stdout, "Failed to create Stream thread");
-            return NULL;
+            avcodec_parameters_free(&params);
+            handle_error("Failed to create push_rtmp_handler thread", AVERROR(EAGAIN), &fmt_ctx, &origin_packet, &codec_ctx);
         }
         pthread_detach(push_stream_thread);
     }
@@ -208,7 +205,7 @@ void *pull_stream_handler_thread(void *arg)
     {
         if (args->ctx->is_cancelled)
         {
-            goto END;
+            break;
         }
         if (origin_packet->stream_index == video_stream_index)
         {
@@ -220,15 +217,13 @@ void *pull_stream_handler_thread(void *arg)
                 av_packet_unref(origin_packet);
                 continue;
             }
-
             AVFrame *origin_frame = av_frame_alloc();
             if (!origin_frame)
             {
-                fprintf(stdout, "Error: Failed to allocate frame(%s).\n", get_av_error(ret));
+                fprintf(stdout, "Error: Failed to allocate frame(%s).\n", get_av_error(AVERROR(ENOMEM)));
                 av_packet_unref(origin_packet);
                 continue;
             }
-
             // Receive the decoded frame from the decoder
             ret = avcodec_receive_frame(codec_ctx, origin_frame);
             if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
@@ -247,62 +242,29 @@ void *pull_stream_handler_thread(void *arg)
             }
             else
             {
-                {
-                    AVFrame *output_frame = av_frame_clone(origin_frame);
-                    QueueItem outputItem;
-                    outputItem.type = ONLY_FRAME;
-                    outputItem.data = output_frame;
-                    memset(outputItem.Boxes, 0, sizeof(outputItem.Boxes));
-                    if (!enqueue(args->video_queue, outputItem))
-                    {
-                        av_frame_free(&output_frame);
-                    }
-                }
-                {
-                    AVFrame *output_frame = av_frame_clone(origin_frame);
-                    QueueItem outputItem;
-                    outputItem.type = ONLY_FRAME;
-                    outputItem.data = output_frame;
-                    memset(outputItem.Boxes, 0, sizeof(outputItem.Boxes));
-                    if (!enqueue(args->origin_frame_queue, outputItem))
-                    {
-                        av_frame_free(&output_frame);
-                    }
-                }
-                {
-                    AVFrame *output_frame = av_frame_clone(origin_frame);
-                    QueueItem outputItem;
-                    outputItem.type = ONLY_FRAME;
-                    outputItem.data = output_frame;
-                    memset(outputItem.Boxes, 0, sizeof(outputItem.Boxes));
-                    if (!enqueue(args->record_frame_queue, outputItem))
-                    {
-                        av_frame_free(&output_frame);
-                    }
-                }
-                {
-                    AVFrame *output_frame = av_frame_clone(origin_frame);
-                    QueueItem outputItem;
-                    outputItem.type = ONLY_FRAME;
-                    outputItem.data = output_frame;
-                    memset(outputItem.Boxes, 0, sizeof(outputItem.Boxes));
-                    if (!enqueue(args->detection_queue, outputItem))
-                    {
-                        av_frame_free(&output_frame);
-                    }
-                }
+
+                clone_and_enqueue(origin_frame, args->video_queue);
+                clone_and_enqueue(origin_frame, args->origin_frame_queue);
+                clone_and_enqueue(origin_frame, args->record_frame_queue);
+                clone_and_enqueue(origin_frame, args->detection_queue);
             }
             av_frame_free(&origin_frame);
         }
         av_packet_unref(origin_packet);
     }
-
-END:
     fprintf(stdout, "Stream handler thread stopped\n");
-    CancelContext(push_stream_thread_ctx);
-    CancelContext(record_mp4_thread_ctx);
-    pthread_mutex_destroy(&push_stream_thread_ctx->mtx);
-    pthread_mutex_destroy(&record_mp4_thread_ctx->mtx);
+    // 取消上下文并销毁互斥锁
+    if (push_stream_thread_ctx)
+    {
+        CancelContext(push_stream_thread_ctx);
+        pthread_mutex_destroy(&push_stream_thread_ctx->mtx);
+    }
+    if (record_mp4_thread_ctx)
+    {
+        CancelContext(record_mp4_thread_ctx);
+        pthread_mutex_destroy(&record_mp4_thread_ctx->mtx);
+    }
+    // 释放资源
     avcodec_free_context(&codec_ctx);
     av_packet_free(&origin_packet);
     avformat_close_input(&fmt_ctx);

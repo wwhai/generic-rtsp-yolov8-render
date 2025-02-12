@@ -16,7 +16,8 @@
 #ifndef STREAM_HANDLER_H
 #define STREAM_HANDLER_H
 #include "thread_args.h"
-
+void clone_and_enqueue(AVFrame *src_frame, FrameQueue *queue);
+void handle_error(const char *message, int ret, AVFormatContext **fmt_ctx, AVPacket **origin_packet, AVCodecContext **codec_ctx);
 void *pull_stream_handler_thread(void *arg);
 
 #endif // STREAM_HANDLER_H
