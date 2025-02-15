@@ -29,7 +29,12 @@ static pthread_t timer_thread;
 static volatile int running = 0;
 static int latest_warning_type;
 static int latest_warning_timestamp;
-
+//
+void print_warning_info(WarningInfo *info)
+{
+    printf("WarningInfo: warning_count=%u, interval_ms=%u, latest_warning_type=%d, latest_warning_timestamp=%d\n",
+           info->warning_count, info->interval_ms, info->latest_warning_type, info->latest_warning_timestamp);
+}
 // 计时器线程函数
 static void *timer_thread_func(void *arg)
 {
@@ -101,5 +106,5 @@ void warning_timer_stop()
 void event_triggered(WarningInfo *info)
 {
     // post_recognized_type("http://127.0.0.1:3345", result.class_id, (const char *)"1234567890abcdef");
-    printf("Event triggered: %u warnings in %u ms!\n", info->warning_count, info->interval_ms);
+    print_warning_info(info);
 }

@@ -26,7 +26,8 @@ typedef struct
     int latest_warning_type;      // 最新告警类型
     int latest_warning_timestamp; // 最新告警时间戳
 } WarningInfo;
-
+// 打印WarningInfo
+void print_warning_info(WarningInfo *info);
 // 初始化告警计时器
 // interval_ms: 时间间隔 T（毫秒）
 // threshold: 告警次数阈值 N
