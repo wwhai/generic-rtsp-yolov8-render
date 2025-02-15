@@ -28,13 +28,9 @@ void post_recognized_type(const char *url, int type, const char *device_uuid)
     time_t now = time(NULL);
     struct tm *tm_info;
     char ts[20];
-    // 将时间戳转换为本地时间
     tm_info = localtime(&now);
-    // 使用 strftime 函数将时间格式化为 YYYY-MM-DD HH:MM:SS
     strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S", tm_info);
-    // 构建 JSON 数据
     snprintf(json_body, sizeof(json_body), "{\"type\": %d, \"ts\": \"%s\", \"device_uuid\": \"%s\"}", type, ts, device_uuid);
-    // 输出JSON
     fprintf(stdout, "====== post_recognized_type json_body ======\n");
     fprintf(stdout, "POST: %s, Body: %s\n", url, json_body);
     fprintf(stdout, "============================================\n");

@@ -19,7 +19,7 @@
 #include <pthread.h>
 #include <time.h>
 #include <unistd.h>
-
+#include "http_api.h"
 // 全局变量
 static uint32_t interval_ms;
 static uint32_t threshold;
@@ -105,6 +105,6 @@ void warning_timer_stop()
 // 触发事件的回调函数
 void event_triggered(WarningInfo *info)
 {
-    // post_recognized_type("http://127.0.0.1:3345", result.class_id, (const char *)"1234567890abcdef");
-    print_warning_info(info);
+    post_recognized_type("http://127.0.0.1:3345", info->latest_warning_type, (const char *)"1234567890abcdef");
+    // print_warning_info(info);
 }
