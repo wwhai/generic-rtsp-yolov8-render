@@ -16,7 +16,8 @@
 #include "opencv_utils.h"
 #include <iostream>
 #include "coco_class.h"
-#include "http_api.h"
+#include "warning_timer.h"
+#include "timestamp_utils.h"
 // 初始化YOLOv8模型
 int Init_CV_ONNX_DNN_Yolov8(const char *model_path, cv::dnn::Net *net)
 {
@@ -76,7 +77,7 @@ int Infer_CV_ONNX_DNN_Yolov8(cv::dnn::Net *net, cv::Mat frame, std::vector<Box> 
         // 测试：检测到人以后 POST 具体的识别JSON
         if (strcmp(coco_name, "person") == 0)
         {
-            // post_recognized_type("http://127.0.0.1:3345", result.class_id, (const char *)"1234567890abcdef");
+            warning_timer_record_warning(result.class_id, get_current_timestamp());
         }
         cv::Rect box_in_letterbox(result.x, result.y, result.w, result.h);
         cv::Rect box_in_original = map_box_to_original(box_in_letterbox, frame.size(), letterboxed_frame.size());

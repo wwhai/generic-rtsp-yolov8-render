@@ -26,6 +26,7 @@
 #include "background.h"
 #include "context.h"
 #include "push_stream_thread.h"
+#include "warning_timer.h"
 #include <curl/curl.h>
 // 全局上下文指针数组
 Context *contexts[4];
@@ -99,6 +100,9 @@ int main(int argc, char *argv[])
         perror("Failed to set signal handler for SIGTERM");
         return 1;
     }
+    // 初始化告警计时器
+    warning_timer_init(10000, 10, event_triggered);
+    // 初始化cURL库
     curl_global_init(CURL_GLOBAL_ALL);
     const char *pull_from_camera_url = argv[1];
     const char *push_to_camera_url = argv[2];
@@ -159,5 +163,7 @@ int main(int argc, char *argv[])
     destroy_contexts();
     destroy_frame_queues(queues, 6);
     curl_global_cleanup();
+    // 清理计时器
+    warning_timer_stop();
     return EXIT_SUCCESS;
 }
