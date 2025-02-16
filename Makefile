@@ -1,12 +1,12 @@
 # Compiler and flags
 CC = g++
-CFLAGS = -Wall -O2 -I$(INCDIR) `pkg-config --cflags libavformat libavcodec libavutil libswscale sdl2 SDL2_ttf opencv4 libcurl libpng`
-LDFLAGS = `pkg-config --libs libavformat libavcodec libavutil libswscale sdl2 SDL2_ttf opencv4 libcurl libpng` -lpthread
+CFLAGS = -Wall -O2 -I$(INCDIR) `pkg-config --cflags libavformat libavcodec libavutil libswscale sdl2 SDL2_ttf opencv4 libcurl`
+LDFLAGS = `pkg-config --libs libavformat libavcodec libavutil libswscale sdl2 SDL2_ttf opencv4 libcurl` -lpthread
 
 # Target executable
 TARGET = generic-stream-yolov8-render
 # Output
-OUTPUT_RES = *.mp4 *.jpg *.png *.exe *.log *.dat *.txt
+OUTPUT_RES = *.mp4 *.jpg *.png *.exe *.log *.dat *.txt *.bmp
 # Source and object files
 SRCDIR = src
 OBJDIR = obj

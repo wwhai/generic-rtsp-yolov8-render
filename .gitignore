@@ -2,6 +2,10 @@
 generic-stream-yolov8-render
 *.jpg
 *.png
+*.jpeg
+*.bmp
+*.gif
+*.ico
 *.o
 *.ko
 *.obj

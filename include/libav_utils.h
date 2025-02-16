@@ -29,7 +29,7 @@ extern "C"
 const char *get_av_error(int errnum);
 
 // 截图
-int capture_image(AVFrame *srcFrame, const char *file_path);
+void save_frame_as_bmp(AVFrame *frame, const char *filename);
 //
 Box InterpolateBox(Box prevBox, Box currentBox, float t);
 //

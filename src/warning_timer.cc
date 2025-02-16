@@ -113,6 +113,6 @@ void event_triggered(WarningInfo *info)
     // post_recognized_type("http://127.0.0.1:3345", info->latest_warning_type, (const char *)"1234567890abcdef");
     print_warning_info(info);
     char filename[256];
-    sprintf(filename, "./warning_%d.jpg", info->latest_warning_timestamp);
-    // capture_image(info->frame, filename);
+    sprintf(filename, "./warning_%d.bmp", info->latest_warning_timestamp);
+    save_frame_as_bmp(info->frame, filename);
 }

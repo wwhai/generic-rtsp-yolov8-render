@@ -16,7 +16,6 @@
 #include "frame_queue.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <png.h>
 #include <libavutil/imgutils.h>
 // 保存AVFrame图像到文件，格式为png
 const char *get_av_error(int errnum)
@@ -24,128 +23,6 @@ const char *get_av_error(int errnum)
     static char str[AV_ERROR_MAX_STRING_SIZE];
     av_strerror(errnum, str, sizeof(str));
     return str;
-}
-
-int capture_image(AVFrame *frame, const char *filename)
-{
-    if (!frame || !filename)
-    {
-        fprintf(stderr, "Invalid input: frame or filename is NULL\n");
-        return -1;
-    }
-
-    int width = frame->width;
-    int height = frame->height;
-
-    // 确保图像尺寸有效
-    if (width <= 0 || height <= 0)
-    {
-        fprintf(stderr, "Invalid frame dimensions: %dx%d\n", width, height);
-        return -1;
-    }
-
-    // 创建一个新的 AVFrame 用于存储 RGB 图像
-    AVFrame *rgbFrame = av_frame_alloc();
-    if (!rgbFrame)
-    {
-        fprintf(stderr, "Failed to allocate memory for RGB frame\n");
-        return -1;
-    }
-
-    // 设置目标图像的格式为 RGB24
-    rgbFrame->format = AV_PIX_FMT_RGB24;
-    rgbFrame->width = width;
-    rgbFrame->height = height;
-
-    // 分配图像数据内存
-    if (av_image_alloc(rgbFrame->data, rgbFrame->linesize, width, height, AV_PIX_FMT_RGB24, 1) < 0)
-    {
-        fprintf(stderr, "Failed to allocate memory for RGB image\n");
-        av_frame_free(&rgbFrame);
-        return -1;
-    }
-
-    // 创建转换上下文
-    struct SwsContext *sws_ctx = sws_getContext(
-        width, height, AV_PIX_FMT_YUV420P, // 输入格式为 YUV420P
-        width, height, AV_PIX_FMT_RGB24,   // 输出格式为 RGB24
-        SWS_BILINEAR, NULL, NULL, NULL     // 使用双线性插值进行转换
-    );
-    if (!sws_ctx)
-    {
-        fprintf(stderr, "Failed to create sws context\n");
-        av_frame_free(&rgbFrame);
-        return -1;
-    }
-
-    // 将 YUV420 图像转换为 RGB
-    sws_scale(sws_ctx, (const uint8_t *const *)frame->data, frame->linesize, 0, height, rgbFrame->data, rgbFrame->linesize);
-
-    // 释放转换上下文
-    sws_freeContext(sws_ctx);
-
-    // 打开 PNG 文件进行写入
-    FILE *png_file = fopen(filename, "wb");
-    if (!png_file)
-    {
-        perror("Failed to open file for writing");
-        av_frame_free(&rgbFrame);
-        return -1;
-    }
-
-    // 创建 libpng 写入结构
-    png_structp png = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
-    if (!png)
-    {
-        fprintf(stderr, "Failed to create PNG write struct\n");
-        fclose(png_file);
-        av_frame_free(&rgbFrame);
-        return -1;
-    }
-
-    png_infop info = png_create_info_struct(png);
-    if (!info)
-    {
-        fprintf(stderr, "Failed to create PNG info struct\n");
-        png_destroy_write_struct(&png, NULL);
-        fclose(png_file);
-        av_frame_free(&rgbFrame);
-        return -1;
-    }
-
-    // 设置错误处理
-    if (setjmp(png_jmpbuf(png)))
-    {
-        png_destroy_write_struct(&png, &info);
-        fclose(png_file);
-        av_frame_free(&rgbFrame);
-        return -1;
-    }
-
-    // 初始化 PNG 写入
-    png_init_io(png, png_file);
-
-    // 设置 PNG 图像头部信息
-    png_set_IHDR(
-        png, info, width, height, 8, PNG_COLOR_TYPE_RGB, PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_BASE, PNG_FILTER_NONE);
-    png_write_info(png, info);
-
-    // 将每一行 RGB 数据写入 PNG 文件
-    for (int y = 0; y < height; y++)
-    {
-        png_bytep row = (png_bytep)(rgbFrame->data[0] + y * rgbFrame->linesize[0]);
-        png_write_row(png, row);
-    }
-
-    // 结束 PNG 写入
-    png_write_end(png, info);
-
-    // 清理
-    png_destroy_write_struct(&png, &info);
-    fclose(png_file);
-    av_frame_free(&rgbFrame);
-
-    return 0;
 }
 
 // 简单的线性插值
@@ -185,4 +62,140 @@ void copy_codec_context_properties(AVCodecContext *src_ctx, AVCodecContext *dst_
     }
     // 释放 AVCodecParameters
     avcodec_parameters_free(&params);
+}
+
+// 保存 AVFrame 为 BMP 文件
+void save_frame_as_bmp(AVFrame *frame, const char *filename)
+{
+    if (!frame || !filename)
+    {
+        fprintf(stderr, "Invalid input parameters\n");
+        return;
+    }
+
+    int width = frame->width;
+    int height = frame->height;
+    if (width <= 0 || height <= 0)
+    {
+        fprintf(stderr, "Invalid frame dimensions: %d*%d\n", width, height);
+        return;
+    }
+    AVPixelFormat input_format = (AVPixelFormat)frame->format;
+    AVPixelFormat output_format = AV_PIX_FMT_BGR24;
+
+    // 检查像素格式是否支持
+    const AVPixFmtDescriptor *input_desc = av_pix_fmt_desc_get(input_format);
+    const AVPixFmtDescriptor *output_desc = av_pix_fmt_desc_get(output_format);
+    if (!input_desc || !output_desc)
+    {
+        fprintf(stderr, "Unsupported pixel format\n");
+        return;
+    }
+
+    // 打开文件
+    FILE *file = fopen(filename, "wb");
+    if (!file)
+    {
+        fprintf(stderr, "Failed to open file: %s\n", filename);
+        return;
+    }
+
+    // BMP 文件头
+    unsigned char bmp_file_header[14] = {
+        'B', 'M',   // 文件类型
+        0, 0, 0, 0, // 文件大小
+        0, 0,       // 保留
+        0, 0,       // 保留
+        54          // 数据偏移量
+    };
+
+    // BMP 信息头
+    unsigned char bmp_info_header[40] = {
+        40, 0, 0, 0, // 信息头大小
+        0, 0, 0, 0,  // 图像宽度
+        0, 0, 0, 0,  // 图像高度
+        1, 0,        // 平面数
+        24, 0,       // 位深度
+        0, 0, 0, 0,  // 压缩方式
+        0, 0, 0, 0,  // 图像数据大小
+        0, 0, 0, 0,  // 水平分辨率
+        0, 0, 0, 0,  // 垂直分辨率
+        0, 0, 0, 0,  // 调色板颜色数
+        0, 0, 0, 0   // 重要颜色数
+    };
+
+    int row_size = (width * 3 + 3) & ~3; // 每行字节数按 4 字节对齐
+    int file_size = 54 + row_size * height;
+
+    // 设置文件大小
+    bmp_file_header[2] = (unsigned char)(file_size);
+    bmp_file_header[3] = (unsigned char)(file_size >> 8);
+    bmp_file_header[4] = (unsigned char)(file_size >> 16);
+    bmp_file_header[5] = (unsigned char)(file_size >> 24);
+
+    // 设置图像宽度和高度
+    bmp_info_header[4] = (unsigned char)(width);
+    bmp_info_header[5] = (unsigned char)(width >> 8);
+    bmp_info_header[6] = (unsigned char)(width >> 16);
+    bmp_info_header[7] = (unsigned char)(width >> 24);
+    bmp_info_header[8] = (unsigned char)(height);
+    bmp_info_header[9] = (unsigned char)(height >> 8);
+    bmp_info_header[10] = (unsigned char)(height >> 16);
+    bmp_info_header[11] = (unsigned char)(height >> 24);
+
+    // 写入文件头和信息头
+    fwrite(bmp_file_header, 1, 14, file);
+    fwrite(bmp_info_header, 1, 40, file);
+
+    // 创建图像转换上下文
+    struct SwsContext *sws_ctx = sws_getContext(width, height, input_format,
+                                                width, height, output_format,
+                                                SWS_BILINEAR, NULL, NULL, NULL);
+    if (!sws_ctx)
+    {
+        fprintf(stderr, "Failed to create SwsContext\n");
+        fclose(file);
+        return;
+    }
+
+    // 分配输出帧
+    AVFrame *bgr_frame = av_frame_alloc();
+    if (!bgr_frame)
+    {
+        fprintf(stderr, "Failed to allocate AVFrame\n");
+        sws_freeContext(sws_ctx);
+        fclose(file);
+        return;
+    }
+
+    // 分配输出缓冲区
+    int num_bytes = av_image_get_buffer_size(output_format, width, height, 1);
+    uint8_t *buffer = (uint8_t *)av_malloc(num_bytes * sizeof(uint8_t));
+    if (!buffer)
+    {
+        fprintf(stderr, "Failed to allocate buffer\n");
+        av_frame_free(&bgr_frame);
+        sws_freeContext(sws_ctx);
+        fclose(file);
+        return;
+    }
+
+    // 填充输出帧数据
+    av_image_fill_arrays(bgr_frame->data, bgr_frame->linesize, buffer, output_format, width, height, 1);
+
+    // 进行图像转换
+    sws_scale(sws_ctx, (const uint8_t *const *)frame->data, frame->linesize, 0, height,
+              bgr_frame->data, bgr_frame->linesize);
+
+    // 写入图像数据（BMP 图像是从下到上存储的）
+    for (int y = height - 1; y >= 0; y--)
+    {
+        fwrite(bgr_frame->data[0] + y * bgr_frame->linesize[0], 1, row_size, file);
+    }
+
+    // 释放资源
+    av_free(buffer);
+    av_frame_free(&bgr_frame);
+    sws_freeContext(sws_ctx);
+    fclose(file);
 }
