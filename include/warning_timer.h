@@ -17,14 +17,19 @@
 #define WARNING_TIMER_H
 
 #include <stdint.h>
-
+extern "C"
+{
+#include <libavutil/frame.h>
+#include <libavformat/avformat.h>
+}
 // 定义告警结构体
 typedef struct
 {
-    uint32_t warning_count;       // 告警次数
-    uint32_t interval_ms;         // 时间间隔（毫秒）
-    int latest_warning_type;      // 最新告警类型
-    int latest_warning_timestamp; // 最新告警时间戳
+    uint32_t warning_count;
+    uint32_t interval_ms;
+    char coco_types[40];
+    int latest_warning_timestamp;
+    AVFrame *frame;
 } WarningInfo;
 // 打印WarningInfo
 void print_warning_info(WarningInfo *info);
@@ -37,8 +42,7 @@ int warning_timer_init(uint32_t interval_ms, uint32_t threshold, void (*callback
 // 记录一次告警
 // type: 告警类型
 // timestamp: 告警时间戳
-void warning_timer_record_warning(int type, int timestamp);
-
+void warning_timer_record_warning(char label[40], int timestamp, AVFrame *frame);
 // 停止告警计时器
 void warning_timer_stop();
 

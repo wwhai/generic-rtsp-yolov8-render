@@ -25,298 +25,129 @@ const char *get_av_error(int errnum)
     av_strerror(errnum, str, sizeof(str));
     return str;
 }
-// 保存AVFrame图像到文件，格式为png
-int CaptureImage(AVFrame *srcFrame, const char *file_path)
+
+int capture_image(AVFrame *frame, const char *filename)
 {
-    if (!srcFrame || !file_path)
+    if (!frame || !filename)
     {
+        fprintf(stderr, "Invalid input: frame or filename is NULL\n");
         return -1;
     }
-    FILE *fp = fopen(file_path, "wb");
-    if (!fp)
+
+    int width = frame->width;
+    int height = frame->height;
+
+    // 确保图像尺寸有效
+    if (width <= 0 || height <= 0)
     {
-        return -2;
+        fprintf(stderr, "Invalid frame dimensions: %dx%d\n", width, height);
+        return -1;
     }
-    png_structp png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
-    if (!png_ptr)
+
+    // 创建一个新的 AVFrame 用于存储 RGB 图像
+    AVFrame *rgbFrame = av_frame_alloc();
+    if (!rgbFrame)
     {
-        fclose(fp);
-        return -3;
+        fprintf(stderr, "Failed to allocate memory for RGB frame\n");
+        return -1;
     }
-    png_infop info_ptr = png_create_info_struct(png_ptr);
-    if (!info_ptr)
+
+    // 设置目标图像的格式为 RGB24
+    rgbFrame->format = AV_PIX_FMT_RGB24;
+    rgbFrame->width = width;
+    rgbFrame->height = height;
+
+    // 分配图像数据内存
+    if (av_image_alloc(rgbFrame->data, rgbFrame->linesize, width, height, AV_PIX_FMT_RGB24, 1) < 0)
     {
-        png_destroy_write_struct(&png_ptr, NULL);
-        fclose(fp);
-        return -4;
+        fprintf(stderr, "Failed to allocate memory for RGB image\n");
+        av_frame_free(&rgbFrame);
+        return -1;
     }
-    if (setjmp(png_jmpbuf(png_ptr)))
+
+    // 创建转换上下文
+    struct SwsContext *sws_ctx = sws_getContext(
+        width, height, AV_PIX_FMT_YUV420P, // 输入格式为 YUV420P
+        width, height, AV_PIX_FMT_RGB24,   // 输出格式为 RGB24
+        SWS_BILINEAR, NULL, NULL, NULL     // 使用双线性插值进行转换
+    );
+    if (!sws_ctx)
     {
-        png_destroy_write_struct(&png_ptr, &info_ptr);
-        fclose(fp);
-        return -5;
+        fprintf(stderr, "Failed to create sws context\n");
+        av_frame_free(&rgbFrame);
+        return -1;
     }
-    png_init_io(png_ptr, fp);
-    int width = srcFrame->width;
-    int height = srcFrame->height;
-    // int pixel_format = srcFrame->format;
-    // 假设输入的是YUV420P格式，这里转换为RGB24
-    uint8_t *rgb_data = (uint8_t *)malloc(width * height * 3);
-    if (!rgb_data)
+
+    // 将 YUV420 图像转换为 RGB
+    sws_scale(sws_ctx, (const uint8_t *const *)frame->data, frame->linesize, 0, height, rgbFrame->data, rgbFrame->linesize);
+
+    // 释放转换上下文
+    sws_freeContext(sws_ctx);
+
+    // 打开 PNG 文件进行写入
+    FILE *png_file = fopen(filename, "wb");
+    if (!png_file)
     {
-        png_destroy_write_struct(&png_ptr, &info_ptr);
-        fclose(fp);
-        return -6;
+        perror("Failed to open file for writing");
+        av_frame_free(&rgbFrame);
+        return -1;
     }
+
+    // 创建 libpng 写入结构
+    png_structp png = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+    if (!png)
+    {
+        fprintf(stderr, "Failed to create PNG write struct\n");
+        fclose(png_file);
+        av_frame_free(&rgbFrame);
+        return -1;
+    }
+
+    png_infop info = png_create_info_struct(png);
+    if (!info)
+    {
+        fprintf(stderr, "Failed to create PNG info struct\n");
+        png_destroy_write_struct(&png, NULL);
+        fclose(png_file);
+        av_frame_free(&rgbFrame);
+        return -1;
+    }
+
+    // 设置错误处理
+    if (setjmp(png_jmpbuf(png)))
+    {
+        png_destroy_write_struct(&png, &info);
+        fclose(png_file);
+        av_frame_free(&rgbFrame);
+        return -1;
+    }
+
+    // 初始化 PNG 写入
+    png_init_io(png, png_file);
+
+    // 设置 PNG 图像头部信息
+    png_set_IHDR(
+        png, info, width, height, 8, PNG_COLOR_TYPE_RGB, PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_BASE, PNG_FILTER_NONE);
+    png_write_info(png, info);
+
+    // 将每一行 RGB 数据写入 PNG 文件
     for (int y = 0; y < height; y++)
     {
-        for (int x = 0; x < width; x++)
-        {
-            int index_y = y * width + x;
-            int index_u = (y / 2) * (width / 2) + (x / 2);
-            int index_v = (y / 2) * (width / 2) + (x / 2);
-            int Y = srcFrame->data[0][index_y];
-            int U = srcFrame->data[1][index_u] - 128;
-            int V = srcFrame->data[2][index_v] - 128;
-            int R = Y + 1.402 * V;
-            int G = Y - 0.344 * U - 0.714 * V;
-            int B = Y + 1.772 * U;
-            R = (R < 0) ? 0 : (R > 255) ? 255
-                                        : R;
-            G = (G < 0) ? 0 : (G > 255) ? 255
-                                        : G;
-            B = (B < 0) ? 0 : (B > 255) ? 255
-                                        : B;
-            int index_rgb = (y * width + x) * 3;
-            rgb_data[index_rgb] = R;
-            rgb_data[index_rgb + 1] = G;
-            rgb_data[index_rgb + 2] = B;
-        }
+        png_bytep row = (png_bytep)(rgbFrame->data[0] + y * rgbFrame->linesize[0]);
+        png_write_row(png, row);
     }
-    // 设置PNG文件信息
-    png_set_IHDR(png_ptr, info_ptr, width, height,
-                 8, PNG_COLOR_TYPE_RGB, PNG_INTERLACE_NONE,
-                 PNG_COMPRESSION_TYPE_BASE, PNG_FILTER_TYPE_BASE);
-    // 写入PNG文件头
-    png_write_info(png_ptr, info_ptr);
-    // 准备每行数据的指针数组
-    png_bytep *row_pointers = (png_bytep *)malloc(height * sizeof(png_bytep));
-    if (!row_pointers)
-    {
-        free(rgb_data);
-        png_destroy_write_struct(&png_ptr, &info_ptr);
-        fclose(fp);
-        return -7;
-    }
-    for (int y = 0; y < height; y++)
-    {
-        row_pointers[y] = rgb_data + y * width * 3;
-    }
-    // 写入图像数据
-    png_write_image(png_ptr, row_pointers);
-    // 写入PNG文件尾
-    png_write_end(png_ptr, NULL);
-    // 释放资源
-    free(row_pointers);
-    free(rgb_data);
-    png_destroy_write_struct(&png_ptr, &info_ptr);
-    fclose(fp);
+
+    // 结束 PNG 写入
+    png_write_end(png, info);
+
+    // 清理
+    png_destroy_write_struct(&png, &info);
+    fclose(png_file);
+    av_frame_free(&rgbFrame);
+
     return 0;
 }
 
-/**
- * @brief Record an array of AVFrames to an MP4 file.
- *
- * @param output_file The output MP4 file path.
- * @param frames Array of AVFrame pointers to encode.
- * @param num_frames Number of frames in the array.
- * @param width Width of the video.
- * @param height Height of the video.
- * @param fps Frames per second of the video.
- * @return 0 on success, -1 on failure.
- */
-int RecordAVFrameToMP4(const char *output_file, AVFrame *frames[], int num_frames, int width, int height, int fps)
-{
-    if (!output_file || !frames || num_frames <= 0 || width <= 0 || height <= 0 || fps <= 0)
-    {
-        fprintf(stdout, "Invalid input parameters\n");
-        return -1;
-    }
-
-    AVFormatContext *format_ctx = NULL;
-    const AVCodec *codec = NULL;
-    AVCodecContext *codec_ctx = NULL;
-    AVStream *video_stream = NULL;
-    AVPacket pkt;
-    int ret = 0;
-
-    // Allocate the format context
-    ret = avformat_alloc_output_context2(&format_ctx, NULL, NULL, output_file);
-    if (!format_ctx || ret < 0)
-    {
-        char buffer[64] = {0};
-        char *error = av_make_error_string(buffer, 64, ret);
-        fprintf(stdout, "Could not allocate format context: %s\n", error);
-        return -1;
-    }
-
-    // Find the H.264 codec
-    codec = avcodec_find_encoder(AV_CODEC_ID_H264);
-    if (!codec)
-    {
-        fprintf(stdout, "H.264 codec not found\n");
-        ret = -1;
-        goto cleanup;
-    }
-
-    // Add a video stream to the format context
-    video_stream = avformat_new_stream(format_ctx, codec);
-    if (!video_stream)
-    {
-        fprintf(stdout, "Could not create video stream\n");
-        ret = -1;
-        goto cleanup;
-    }
-    video_stream->time_base = (AVRational){1, fps};
-
-    // Allocate codec context
-    codec_ctx = avcodec_alloc_context3(codec);
-    if (!codec_ctx)
-    {
-        fprintf(stdout, "Could not allocate codec context\n");
-        ret = -1;
-        goto cleanup;
-    }
-
-    // Set codec parameters
-    codec_ctx->codec_id = codec->id;
-    codec_ctx->bit_rate = 400000;
-    codec_ctx->width = width;
-    codec_ctx->height = height;
-    codec_ctx->time_base = video_stream->time_base;
-    codec_ctx->framerate = (AVRational){fps, 1};
-    codec_ctx->gop_size = 12; // Group of pictures size
-    codec_ctx->max_b_frames = 2;
-    codec_ctx->pix_fmt = AV_PIX_FMT_YUV420P;
-
-    // Set global headers for some formats
-    if (format_ctx->oformat->flags & AVFMT_GLOBALHEADER)
-    {
-        codec_ctx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
-    }
-
-    // Open the codec
-    if ((ret = avcodec_open2(codec_ctx, codec, NULL)) < 0)
-    {
-        char buffer[64] = {0};
-        char *error = av_make_error_string(buffer, 64, ret);
-        fprintf(stdout, "Could not open codec: %s\n", error);
-        goto cleanup;
-    }
-
-    // Copy codec parameters to the stream
-    ret = avcodec_parameters_from_context(video_stream->codecpar, codec_ctx);
-    if (ret < 0)
-    {
-        char buffer[64] = {0};
-        char *error = av_make_error_string(buffer, 64, ret);
-        fprintf(stdout, "Could not copy codec parameters: %s\n", error);
-        goto cleanup;
-    }
-
-    // Open output file
-    if (!(format_ctx->oformat->flags & AVFMT_NOFILE))
-    {
-        if ((ret = avio_open(&format_ctx->pb, output_file, AVIO_FLAG_WRITE)) < 0)
-        {
-            char buffer[64] = {0};
-            char *error = av_make_error_string(buffer, 64, ret);
-            fprintf(stdout, "Could not open output file: %s\n", error);
-            goto cleanup;
-        }
-    }
-
-    // Write the header
-    if ((ret = avformat_write_header(format_ctx, NULL)) < 0)
-    {
-        char buffer[64] = {0};
-        char *error = av_make_error_string(buffer, 64, ret);
-        fprintf(stdout, "Error writing header: %s\n", error);
-        goto cleanup;
-    }
-
-    // Encode and write frames
-    for (int i = 0; i < num_frames; i++)
-    {
-        AVFrame *frame = frames[i];
-
-        // Send frame to encoder
-        ret = avcodec_send_frame(codec_ctx, frame);
-        if (ret < 0)
-        {
-            char buffer[64] = {0};
-            char *error = av_make_error_string(buffer, 64, ret);
-            fprintf(stdout, "Error sending frame to encoder: %s\n", error);
-            goto cleanup;
-        }
-
-        // Receive encoded packet
-        while (ret >= 0)
-        {
-            ret = avcodec_receive_packet(codec_ctx, &pkt);
-            if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
-            {
-                break;
-            }
-            else if (ret < 0)
-            {
-                char buffer[64] = {0};
-                char *error = av_make_error_string(buffer, 64, ret);
-                fprintf(stdout, "Error receiving packet from encoder: %s\n", error);
-                goto cleanup;
-            }
-
-            // Rescale timestamp to match stream time base
-            av_packet_rescale_ts(&pkt, codec_ctx->time_base, video_stream->time_base);
-            pkt.stream_index = video_stream->index;
-
-            // Write packet to output file
-            ret = av_interleaved_write_frame(format_ctx, &pkt);
-            av_packet_unref(&pkt);
-            if (ret < 0)
-            {
-                char buffer[64] = {0};
-                char *error = av_make_error_string(buffer, 64, ret);
-                fprintf(stdout, "Error writing packet: %s\n", error);
-                goto cleanup;
-            }
-        }
-    }
-
-    // Write trailer
-    if ((ret = av_write_trailer(format_ctx)) < 0)
-    {
-        char buffer[64] = {0};
-        char *error = av_make_error_string(buffer, 64, ret);
-        fprintf(stdout, "Error writing trailer: %s\n", error);
-    }
-
-cleanup:
-    if (codec_ctx)
-    {
-        avcodec_free_context(&codec_ctx);
-    }
-    if (format_ctx)
-    {
-        if (!(format_ctx->oformat->flags & AVFMT_NOFILE))
-        {
-            avio_closep(&format_ctx->pb);
-        }
-        avformat_free_context(format_ctx);
-    }
-
-    return ret == 0 ? 0 : -1;
-}
 // 简单的线性插值
 Box InterpolateBox(Box prevBox, Box currentBox, float t)
 {

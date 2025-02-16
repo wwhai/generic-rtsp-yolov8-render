@@ -20,6 +20,7 @@
 #include <time.h>
 #include <unistd.h>
 #include "http_api.h"
+#include "libav_utils.h"
 // 全局变量
 static uint32_t interval_ms;
 static uint32_t threshold;
@@ -27,13 +28,14 @@ static void (*event_callback)(WarningInfo *);
 static uint32_t warning_count = 0;
 static pthread_t timer_thread;
 static volatile int running = 0;
-static int latest_warning_type;
 static int latest_warning_timestamp;
+static char last_coco_types[40];
+static AVFrame *last_frame;
 //
 void print_warning_info(WarningInfo *info)
 {
-    printf("WarningInfo: warning_count=%u, interval_ms=%u, latest_warning_type=%d, latest_warning_timestamp=%d\n",
-           info->warning_count, info->interval_ms, info->latest_warning_type, info->latest_warning_timestamp);
+    fprintf(stdout, "Warning triggered! Count: %u, Interval: %ums, Type: %s, Timestamp: %d\n",
+            info->warning_count, info->interval_ms, info->coco_types, info->latest_warning_timestamp);
 }
 // 计时器线程函数
 static void *timer_thread_func(void *arg)
@@ -55,8 +57,9 @@ static void *timer_thread_func(void *arg)
                     WarningInfo info;
                     info.warning_count = warning_count;
                     info.interval_ms = interval_ms;
-                    info.latest_warning_type = latest_warning_type;
+                    memcpy(info.coco_types, last_coco_types, 40);
                     info.latest_warning_timestamp = latest_warning_timestamp;
+                    info.frame = last_frame;
                     event_callback(&info);
                 }
             }
@@ -89,11 +92,12 @@ int warning_timer_init(uint32_t interval_ms_param, uint32_t threshold_param, voi
 }
 
 // 记录一次告警
-void warning_timer_record_warning(int type, int timestamp)
+void warning_timer_record_warning(char label[40], int timestamp, AVFrame *frame)
 {
     warning_count++;
-    latest_warning_type = type;
     latest_warning_timestamp = timestamp;
+    memcpy(last_coco_types, label, 40);
+    last_frame = frame;
 }
 
 // 停止告警计时器
@@ -106,6 +110,9 @@ void warning_timer_stop()
 // 触发事件的回调函数
 void event_triggered(WarningInfo *info)
 {
-    post_recognized_type("http://127.0.0.1:3345", info->latest_warning_type, (const char *)"1234567890abcdef");
-    // print_warning_info(info);
+    // post_recognized_type("http://127.0.0.1:3345", info->latest_warning_type, (const char *)"1234567890abcdef");
+    print_warning_info(info);
+    char filename[256];
+    sprintf(filename, "./warning_%d.jpg", info->latest_warning_timestamp);
+    // capture_image(info->frame, filename);
 }

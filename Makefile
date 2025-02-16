@@ -5,7 +5,8 @@ LDFLAGS = `pkg-config --libs libavformat libavcodec libavutil libswscale sdl2 SD
 
 # Target executable
 TARGET = generic-stream-yolov8-render
-
+# Output
+OUTPUT_RES = *.mp4 *.jpg *.png *.exe *.log *.dat *.txt
 # Source and object files
 SRCDIR = src
 OBJDIR = obj
@@ -27,7 +28,7 @@ $(OBJDIR):
 	mkdir -p $(OBJDIR)
 
 clean:
-	rm -rf $(OBJDIR) $(TARGET)
+	rm -rf $(OBJDIR) $(TARGET) $(OUTPUT_RES)
 
 # Phony targets
 .PHONY: all clean

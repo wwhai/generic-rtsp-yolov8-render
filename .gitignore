@@ -1,5 +1,7 @@
 # Compiled object files
 generic-stream-yolov8-render
+*.jpg
+*.png
 *.o
 *.ko
 *.obj

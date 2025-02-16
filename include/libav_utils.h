@@ -29,9 +29,7 @@ extern "C"
 const char *get_av_error(int errnum);
 
 // 截图
-int CaptureImage(AVFrame *srcFrame, const char *file_path);
-// 录制
-int RecordAVFrameToMP4(const char *output_file, AVFrame *frames[], int num_frames, int width, int height, int fps);
+int capture_image(AVFrame *srcFrame, const char *file_path);
 //
 Box InterpolateBox(Box prevBox, Box currentBox, float t);
 //

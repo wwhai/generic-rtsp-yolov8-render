@@ -20,6 +20,8 @@
 #include <unistd.h>
 #include "opencv_dnn_module.h"
 #include "opencv_utils.h"
+#include "warning_timer.h"
+#include "timestamp_utils.h"
 
 void *frame_detection_thread(void *arg)
 {
@@ -66,6 +68,14 @@ void *frame_detection_thread(void *arg)
                         boxes_item.Boxes[i].h = outputs[i].h;
                         boxes_item.Boxes[i].prop = outputs[i].prop;
                         strcpy(boxes_item.Boxes[i].label, outputs[i].label);
+                        // 测试：检测到人以后 POST 具体的识别JSON
+                        if (strcmp(boxes_item.Boxes[i].label, "person") == 0)
+                        {
+                            if (detection_frame->width > 0 && detection_frame->height > 0)
+                            {
+                                warning_timer_record_warning(boxes_item.Boxes[i].label, get_current_timestamp(), detection_frame);
+                            }
+                        }
                     }
                     enqueue(args->box_queue, boxes_item);
                 }
