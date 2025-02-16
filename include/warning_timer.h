@@ -32,7 +32,7 @@ void print_warning_info(WarningInfo *info);
 // interval_ms: 时间间隔 T（毫秒）
 // threshold: 告警次数阈值 N
 // callback: 触发事件的回调函数
-void warning_timer_init(uint32_t interval_ms, uint32_t threshold, void (*callback)(WarningInfo *));
+int warning_timer_init(uint32_t interval_ms, uint32_t threshold, void (*callback)(WarningInfo *));
 
 // 记录一次告警
 // type: 告警类型

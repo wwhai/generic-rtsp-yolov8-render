@@ -42,20 +42,28 @@ void clone_and_enqueue(AVFrame *src_frame, FrameQueue *queue)
     }
 }
 // 自定义错误处理和资源释放函数
+
 void handle_error(const char *message, int ret, AVFormatContext **fmt_ctx, AVPacket **origin_packet, AVCodecContext **codec_ctx)
 {
-    fprintf(stdout, "%s (%s).\n", message, get_av_error(ret));
-    if (*codec_ctx)
+    if (message == nullptr)
+    {
+        message = "Unknown error";
+    }
+    fprintf(stderr, "%s (%s).\n", message, get_av_error(ret));
+    if (codec_ctx != nullptr && *codec_ctx != nullptr)
     {
         avcodec_free_context(codec_ctx);
+        *codec_ctx = nullptr;
     }
-    if (*origin_packet)
+    if (origin_packet != nullptr && *origin_packet != nullptr)
     {
         av_packet_free(origin_packet);
+        *origin_packet = nullptr;
     }
-    if (*fmt_ctx)
+    if (fmt_ctx != nullptr && *fmt_ctx != nullptr)
     {
         avformat_close_input(fmt_ctx);
+        *fmt_ctx = nullptr;
     }
     pthread_exit(NULL);
 }

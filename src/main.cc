@@ -28,6 +28,7 @@
 #include "push_stream_thread.h"
 #include "warning_timer.h"
 #include <curl/curl.h>
+
 // 全局上下文指针数组
 Context *contexts[4];
 
@@ -88,45 +89,56 @@ void destroy_frame_queues(FrameQueue *queues, int num_queues)
 
 int main(int argc, char *argv[])
 {
+    // 检查命令行参数数量
     if (argc < 3)
     {
-        fprintf(stdout, "Usage: %s <camera_URL> <PUSH_URL>\n", argv[0]);
-        return 1;
+        fprintf(stderr, "Usage: %s <camera_URL> <PUSH_URL>\n", argv[0]);
+        return EXIT_FAILURE;
     }
 
     // 设置信号处理函数
     if (signal(SIGINT, handle_signal) == SIG_ERR)
     {
-        perror("Failed to set signal handler for SIGTERM");
-        return 1;
+        perror("Failed to set signal handler for SIGINT");
+        return EXIT_FAILURE;
     }
+
     // 初始化告警计时器
-    warning_timer_init(10000, 10, event_triggered);
+    if (warning_timer_init(10000, 10, event_triggered) != 0)
+    {
+        fprintf(stderr, "Failed to initialize warning timer\n");
+        return EXIT_FAILURE;
+    }
+
     // 初始化cURL库
-    curl_global_init(CURL_GLOBAL_ALL);
+    if (curl_global_init(CURL_GLOBAL_ALL) != CURLE_OK)
+    {
+        fprintf(stderr, "Failed to initialize cURL library\n");
+        warning_timer_stop();
+        return EXIT_FAILURE;
+    }
+
     const char *pull_from_camera_url = argv[1];
     const char *push_to_camera_url = argv[2];
 
     // 创建上下文
-    contexts[0] = CreateContext();
-    contexts[1] = CreateContext();
-    contexts[2] = CreateContext();
-    contexts[3] = CreateContext();
-
-    // 检查上下文是否创建成功
     for (int i = 0; i < 4; i++)
     {
+        contexts[i] = CreateContext();
         if (!contexts[i])
         {
-            fprintf(stdout, "Failed to create context %d\n", i);
+            fprintf(stderr, "Failed to create context %d\n", i);
             destroy_contexts();
-            return 1;
+            curl_global_cleanup();
+            warning_timer_stop();
+            return EXIT_FAILURE;
         }
     }
 
     // 初始化帧队列
-    FrameQueue queues[6];
-    for (int i = 0; i < 6; i++)
+    const int num_queues = 6;
+    FrameQueue queues[num_queues];
+    for (int i = 0; i < num_queues; i++)
     {
         frame_queue_init(&queues[i], 60);
     }
@@ -144,8 +156,10 @@ int main(int argc, char *argv[])
         create_thread(&threads[3], frame_detection_thread, &common_args) != 0)
     {
         destroy_contexts();
-        destroy_frame_queues(queues, 6);
-        return 1;
+        destroy_frame_queues(queues, num_queues);
+        curl_global_cleanup();
+        warning_timer_stop();
+        return EXIT_FAILURE;
     }
 
     fprintf(stdout, "Main thread waiting for threads to finish...\n");
@@ -153,17 +167,24 @@ int main(int argc, char *argv[])
     // 分离线程
     for (int i = 1; i < 4; i++)
     {
-        pthread_detach(threads[i]);
+        if (pthread_detach(threads[i]) != 0)
+        {
+            perror("Failed to detach thread");
+        }
     }
 
     // 等待后台线程结束
-    pthread_join(threads[0], NULL);
+    if (pthread_join(threads[0], NULL) != 0)
+    {
+        perror("Failed to join background thread");
+    }
 
     // 清理资源
     destroy_contexts();
-    destroy_frame_queues(queues, 6);
+    destroy_frame_queues(queues, num_queues);
     curl_global_cleanup();
     // 清理计时器
     warning_timer_stop();
+
     return EXIT_SUCCESS;
 }

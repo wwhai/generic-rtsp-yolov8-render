@@ -71,7 +71,7 @@ static void *timer_thread_func(void *arg)
 }
 
 // 初始化告警计时器
-void warning_timer_init(uint32_t interval_ms_param, uint32_t threshold_param, void (*callback)(WarningInfo *))
+int warning_timer_init(uint32_t interval_ms_param, uint32_t threshold_param, void (*callback)(WarningInfo *))
 {
     interval_ms = interval_ms_param;
     threshold = threshold_param;
@@ -85,6 +85,7 @@ void warning_timer_init(uint32_t interval_ms_param, uint32_t threshold_param, vo
         exit(EXIT_FAILURE);
     }
     fprintf(stdout, "Warning timer initialized!\n");
+    return 0;
 }
 
 // 记录一次告警
