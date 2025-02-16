@@ -168,7 +168,6 @@ void save_mp4(Mp4StreamContext *ctx, AVFrame *frame)
     av_packet_free(&pkt);
 }
 
-// 推流线程处理函数
 void *save_mp4_handler_thread(void *arg)
 {
     ThreadArgs *args = (ThreadArgs *)arg;
@@ -176,13 +175,22 @@ void *save_mp4_handler_thread(void *arg)
     Mp4StreamContext ctx;
     memset(&ctx, 0, sizeof(Mp4StreamContext));
     ctx.input_stream = args->input_stream;
+
     // 初始化输出流
     fprintf(stdout, "Start save mp4 record thread\n");
-    if (init_mp4_stream(&ctx, "./local.mp4", 1920, 1080, 25) < 0)
+    // 获取当前时间戳作为文件名
+    time_t current_time = time(NULL);
+    char file_name[100];
+    strftime(file_name, sizeof(file_name), "./local_%Y%m%d_%H%M%S.mp4", localtime(&current_time));
+    if (init_mp4_stream(&ctx, file_name, 1920, 1080, 25) < 0)
     {
         fprintf(stdout, "Failed to initialize RTMP stream\n");
         return NULL;
     }
+
+    // 记录开始时间
+    time_t start_time = time(NULL);
+    int file_index = 0;
 
     // Main processing loop
     while (!args->ctx->is_cancelled)
@@ -195,12 +203,37 @@ void *save_mp4_handler_thread(void *arg)
             if (item.type == ONLY_FRAME && item.data)
             {
                 AVFrame *frame = (AVFrame *)item.data;
+                // 检查是否超过 30 分钟
+                current_time = time(NULL);
+                double elapsed_time = difftime(current_time, start_time);
+                if (elapsed_time >= 30 * 60)
+                {
+                    // 关闭当前文件
+                    av_write_trailer(ctx.output_ctx);
+                    avio_closep(&ctx.output_ctx->pb);
+                    avcodec_free_context(&ctx.codec_ctx);
+                    avformat_free_context(ctx.output_ctx);
+
+                    // 新建文件
+                    file_index++;
+                    // 获取新的时间戳作为文件名
+                    current_time = time(NULL);
+                    strftime(file_name, sizeof(file_name), "./local_%Y%m%d_%H%M%S.mp4", localtime(&current_time));
+                    memset(&ctx, 0, sizeof(Mp4StreamContext));
+                    ctx.input_stream = args->input_stream;
+                    if (init_mp4_stream(&ctx, file_name, 1920, 1080, 25) < 0)
+                    {
+                        fprintf(stdout, "Failed to initialize new MP4 stream\n");
+                        return NULL;
+                    }
+                    start_time = time(NULL);
+                }
                 save_mp4(&ctx, frame);
                 av_frame_free(&frame);
             }
         }
     }
-    // 清理资源
+
     fprintf(stdout, "Stop save mp4 record thread\n");
     av_write_trailer(ctx.output_ctx);
     avio_closep(&ctx.output_ctx->pb);
