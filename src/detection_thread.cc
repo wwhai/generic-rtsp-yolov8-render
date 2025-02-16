@@ -22,7 +22,7 @@
 #include "opencv_utils.h"
 #include "warning_timer.h"
 #include "timestamp_utils.h"
-
+#include "logger.h"
 void *frame_detection_thread(void *arg)
 {
     const ThreadArgs *args = (ThreadArgs *)arg;
@@ -30,7 +30,7 @@ void *frame_detection_thread(void *arg)
     cv::dnn::Net net;
     if (Init_CV_ONNX_DNN_Yolov8(modelPath, &net) != 0)
     {
-        printf("Error: Failed to initialize the YOLOv8 ONNX DNN model.\n");
+        log_info( "Error: Failed to initialize the YOLOv8 ONNX DNN model.");
         pthread_exit(NULL);
         return NULL;
     }

@@ -18,6 +18,7 @@
 #include <pthread.h>
 #include <unistd.h>
 #include "context.h"
+#include "logger.h"
 
 // 创建 Context 结构体
 Context *CreateContext()
@@ -25,18 +26,15 @@ Context *CreateContext()
     Context *ctx = (Context *)malloc(sizeof(Context));
     if (ctx == NULL)
     {
-        perror("malloc");
         return NULL;
     }
     if (pthread_mutex_init(&ctx->mtx, NULL) != 0)
     {
-        perror("pthread_mutex_init");
         free(ctx);
         return NULL;
     }
     if (pthread_cond_init(&ctx->cond, NULL) != 0)
     {
-        perror("pthread_cond_init");
         pthread_mutex_destroy(&ctx->mtx);
         free(ctx);
         return NULL;

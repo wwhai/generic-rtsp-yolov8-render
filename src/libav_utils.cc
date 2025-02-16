@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <libavutil/imgutils.h>
+#include "logger.h"
 // 保存AVFrame图像到文件，格式为png
 const char *get_av_error(int errnum)
 {
@@ -69,7 +70,7 @@ void save_frame_as_bmp(AVFrame *frame, const char *filename)
 {
     if (!frame || !filename)
     {
-        fprintf(stderr, "Invalid input parameters\n");
+        log_info( "Invalid input parameters");
         return;
     }
 
@@ -77,18 +78,18 @@ void save_frame_as_bmp(AVFrame *frame, const char *filename)
     int height = frame->height;
     if (width <= 0 || height <= 0)
     {
-        fprintf(stderr, "Invalid frame dimensions: %d*%d\n", width, height);
+        log_info( "Invalid frame dimensions: %d*%d", width, height);
         return;
     }
     AVPixelFormat input_format = (AVPixelFormat)frame->format;
-    AVPixelFormat output_format = AV_PIX_FMT_BGR24;
+    AVPixelFormat output_format = AV_PIX_FMT_YUV420P;
 
     // 检查像素格式是否支持
     const AVPixFmtDescriptor *input_desc = av_pix_fmt_desc_get(input_format);
     const AVPixFmtDescriptor *output_desc = av_pix_fmt_desc_get(output_format);
     if (!input_desc || !output_desc)
     {
-        fprintf(stderr, "Unsupported pixel format\n");
+        log_info( "Unsupported pixel format");
         return;
     }
 
@@ -96,7 +97,7 @@ void save_frame_as_bmp(AVFrame *frame, const char *filename)
     FILE *file = fopen(filename, "wb");
     if (!file)
     {
-        fprintf(stderr, "Failed to open file: %s\n", filename);
+        log_info( "Failed to open file: %s", filename);
         return;
     }
 
@@ -153,7 +154,7 @@ void save_frame_as_bmp(AVFrame *frame, const char *filename)
                                                 SWS_BILINEAR, NULL, NULL, NULL);
     if (!sws_ctx)
     {
-        fprintf(stderr, "Failed to create SwsContext\n");
+        log_info( "Failed to create SwsContext");
         fclose(file);
         return;
     }
@@ -162,7 +163,7 @@ void save_frame_as_bmp(AVFrame *frame, const char *filename)
     AVFrame *bgr_frame = av_frame_alloc();
     if (!bgr_frame)
     {
-        fprintf(stderr, "Failed to allocate AVFrame\n");
+        log_info( "Failed to allocate AVFrame");
         sws_freeContext(sws_ctx);
         fclose(file);
         return;
@@ -173,7 +174,7 @@ void save_frame_as_bmp(AVFrame *frame, const char *filename)
     uint8_t *buffer = (uint8_t *)av_malloc(num_bytes * sizeof(uint8_t));
     if (!buffer)
     {
-        fprintf(stderr, "Failed to allocate buffer\n");
+        log_info( "Failed to allocate buffer");
         av_frame_free(&bgr_frame);
         sws_freeContext(sws_ctx);
         fclose(file);

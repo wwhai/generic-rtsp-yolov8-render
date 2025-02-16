@@ -15,6 +15,7 @@
 
 #include "sdl_utils.h"
 #include "frame_queue.h"
+#include "logger.h"
 void NV12ToRGB(uint8_t *y_plane, uint8_t *uv_plane, int width,
                int height, int y_pitch, int uv_pitch, uint8_t *rgb_buffer)
 {
@@ -59,7 +60,7 @@ void SDLDisplayNV12Frame(SDL_Renderer *renderer, SDL_Texture *texture, AVFrame *
         frame->width <= 0 ||
         frame->height <= 0)
     {
-        fprintf(stdout, "frame is null or invalid\n");
+        log_info( "frame is null or invalid");
         return;
     }
 
@@ -72,7 +73,7 @@ void SDLDisplayNV12Frame(SDL_Renderer *renderer, SDL_Texture *texture, AVFrame *
     uint8_t *rgb_buffer = (uint8_t *)malloc(width * height * 3);
     if (!rgb_buffer)
     {
-        fprintf(stdout, "Failed to allocate RGB buffer\n");
+        log_info( "Failed to allocate RGB buffer");
         return;
     }
     // 转换 NV12 为 RGB
@@ -80,7 +81,7 @@ void SDLDisplayNV12Frame(SDL_Renderer *renderer, SDL_Texture *texture, AVFrame *
     // 更新纹理
     if (SDL_UpdateTexture(texture, NULL, rgb_buffer, width * 3) < 0)
     {
-        fprintf(stdout, "Failed to update texture: %s\n", SDL_GetError());
+        log_info( "Failed to update texture: %s", SDL_GetError());
         free(rgb_buffer);
         return;
     }
@@ -103,14 +104,14 @@ void SDLDrawText(SDL_Renderer *renderer, SDL_Texture *texture, TTF_Font *font, c
     SDL_Surface *textSurface = TTF_RenderText_Solid(font, text, textColor);
     if (textSurface == NULL)
     {
-        fprintf(stdout, "Failed to render text: %s\n", TTF_GetError());
+        log_info( "Failed to render text: %s", TTF_GetError());
         return;
     }
     // 创建纹理
     SDL_Texture *textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
     if (textTexture == NULL)
     {
-        fprintf(stdout, "Failed to create texture from surface: %s\n", SDL_GetError());
+        log_info( "Failed to create texture from surface: %s", SDL_GetError());
         SDL_FreeSurface(textSurface);
         return;
     }
@@ -128,7 +129,7 @@ void SDLDrawLabel(SDL_Renderer *renderer, TTF_Font *font, const char *text, int 
     SDL_Surface *textSurface = TTF_RenderText_Solid(font, text, textColor);
     if (!textSurface)
     {
-        printf("Unable to render text surface! SDL_ttf Error: %s\n", TTF_GetError());
+        log_info( "Unable to render text surface! SDL_ttf Error: %s", TTF_GetError());
         return;
     }
     // 创建一个矩形作为背景
@@ -143,7 +144,7 @@ void SDLDrawLabel(SDL_Renderer *renderer, TTF_Font *font, const char *text, int 
 
     if (!textTexture)
     {
-        printf("Unable to create texture from rendered text! SDL_Error: %s\n", SDL_GetError());
+        log_info( "Unable to create texture from rendered text! SDL_Error: %s", SDL_GetError());
         return;
     }
 

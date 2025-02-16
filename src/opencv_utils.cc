@@ -14,6 +14,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "opencv_utils.h"
+#include "logger.h"
 // 将 AVFrame 转换为 OpenCV 的 cv::Mat
 
 cv::Mat AVFrameToCVMat(AVFrame *frame)
@@ -47,7 +48,7 @@ cv::Mat AVFrameToCVMat(AVFrame *frame)
     }
     else
     {
-        fprintf(stdout, "Unsupported pixel format: %s\n", av_get_pix_fmt_name(pix_fmt));
+        log_info( "Unsupported pixel format: %s", av_get_pix_fmt_name(pix_fmt));
         return cv::Mat();
     }
 
@@ -108,7 +109,7 @@ std::vector<DnnResult> postprocess(cv::Mat &frame, const std::vector<cv::Mat> &o
     for (int idx : indices)
     {
         cv::Rect box = boxes[idx];
-        // printf("box: %d, %d, %d, %d, %f, %d\n", box.x, box.y, box.width, box.height, confidences[idx], classIds[idx]);
+        // log_message(LOG_INFO"box: %d, %d, %d, %d, %f, %d", box.x, box.y, box.width, box.height, confidences[idx], classIds[idx]);
         boxes_result.push_back({box.x, box.y, box.width, box.height, confidences[idx], classIds[idx]});
     }
     return boxes_result;

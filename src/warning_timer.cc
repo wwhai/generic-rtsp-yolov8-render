@@ -21,6 +21,7 @@
 #include <unistd.h>
 #include "http_api.h"
 #include "libav_utils.h"
+#include "logger.h"
 // 全局变量
 static uint32_t interval_ms;
 static uint32_t threshold;
@@ -34,8 +35,8 @@ static AVFrame *last_frame;
 //
 void print_warning_info(WarningInfo *info)
 {
-    fprintf(stdout, "Warning triggered! Count: %u, Interval: %ums, Type: %s, Timestamp: %d\n",
-            info->warning_count, info->interval_ms, info->coco_types, info->latest_warning_timestamp);
+    log_info( "Warning triggered! Count: %u, Interval: %ums, Type: %s, Timestamp: %d",
+                info->warning_count, info->interval_ms, info->coco_types, info->latest_warning_timestamp);
 }
 // 计时器线程函数
 static void *timer_thread_func(void *arg)
@@ -84,10 +85,10 @@ int warning_timer_init(uint32_t interval_ms_param, uint32_t threshold_param, voi
 
     if (pthread_create(&timer_thread, NULL, timer_thread_func, NULL) != 0)
     {
-        perror("Failed to create timer thread");
+        log_error( "Failed to create timer thread");
         exit(EXIT_FAILURE);
     }
-    fprintf(stdout, "Warning timer initialized!\n");
+    log_info( "Warning timer initialized!");
     return 0;
 }
 
@@ -105,7 +106,7 @@ void warning_timer_stop()
 {
     running = 0;
     pthread_join(timer_thread, NULL);
-    fprintf(stdout, "Warning timer stopped!\n");
+    log_info( "Warning timer stopped!");
 }
 // 触发事件的回调函数
 void event_triggered(WarningInfo *info)

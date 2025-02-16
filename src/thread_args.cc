@@ -14,9 +14,10 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "thread_args.h"
+#include "logger.h"
 void dump_thread_args(ThreadArgs *args)
 {
-    fprintf(stdout, "=== dump_thread_args ===\n");
-    fprintf(stdout, "input_stream_url=%s\n", args->input_stream_url);
-    fprintf(stdout, "output_stream_url=%s\n", args->output_stream_url);
+    log_info( "=== dump_thread_args ===");
+    log_info( "input_stream_url=%s", args->input_stream_url);
+    log_info( "output_stream_url=%s", args->output_stream_url);
 }

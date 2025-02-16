@@ -15,6 +15,7 @@
 #include "opencv_dnn_module.h"
 #include "opencv_utils.h"
 #include <iostream>
+#include "logger.h"
 #include "coco_class.h"
 // 初始化YOLOv8模型
 int Init_CV_ONNX_DNN_Yolov8(const char *model_path, cv::dnn::Net *net)
@@ -47,7 +48,7 @@ int Infer_CV_ONNX_DNN_Yolov8(cv::dnn::Net *net, cv::Mat frame, std::vector<Box> 
 {
     if (!net)
     {
-        fprintf(stdout, "Error: Net pointer is null.\n");
+        log_info( "Error: Net pointer is null.");
         return -1;
     }
     // 准备输入; YOLOV8图片尺寸需要压缩为640*640
@@ -65,7 +66,7 @@ int Infer_CV_ONNX_DNN_Yolov8(cv::dnn::Net *net, cv::Mat frame, std::vector<Box> 
     // 检查推理结果
     if (outs.empty())
     {
-        fprintf(stdout, "Error: No output from the network.\n");
+        log_info( "Error: No output from the network.");
         return -1;
     }
     std::vector<DnnResult> results = postprocess(frame, outs, 0.25, 0.5);
@@ -92,17 +93,6 @@ int Infer_CV_ONNX_DNN_Yolov8(cv::dnn::Net *net, cv::Mat frame, std::vector<Box> 
 // 释放模型资源
 int Release_CV_ONNX_DNN_Yolov8(cv::dnn::Net *net)
 {
-    try
-    {
-        if (net)
-        {
-            net->~Net();
-        }
-        return 0; // 成功
-    }
-    catch (const std::exception &e)
-    {
-        fprintf(stdout, "Exception during model release: %s\n", e.what());
-        return -1;
-    }
+    log_info( "Releasing YOLOv8 model...");
+    return 0;
 }

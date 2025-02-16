@@ -28,6 +28,7 @@ extern "C"
 #include "libav_utils.h"
 #include "push_stream_thread.h"
 #include "video_record_thread.h"
+#include "logger.h"
 // 克隆帧并加入队列
 void clone_and_enqueue(AVFrame *src_frame, FrameQueue *queue)
 {
@@ -49,7 +50,7 @@ void handle_error(const char *message, int ret, AVFormatContext **fmt_ctx, AVPac
     {
         message = "Unknown error";
     }
-    fprintf(stderr, "%s (%s).\n", message, get_av_error(ret));
+    log_info( "%s (%s).", message, get_av_error(ret));
     if (codec_ctx != nullptr && *codec_ctx != nullptr)
     {
         avcodec_free_context(codec_ctx);
@@ -107,9 +108,9 @@ void *pull_stream_handler_thread(void *arg)
         handle_error("Error: No video stream found", AVERROR_STREAM_NOT_FOUND, &fmt_ctx, &origin_packet, &codec_ctx);
     }
     // Print stream information
-    fprintf(stdout, "=========input_stream_url======== \n");
+    log_info( "=========input_stream_url======== ");
     av_dump_format(fmt_ctx, 0, args->input_stream_url, 0);
-    fprintf(stdout, "================================= \n");
+    log_info( "================================= ");
     // Allocate AVPacket for reading frames
     origin_packet = av_packet_alloc();
     if (!origin_packet)
@@ -146,14 +147,14 @@ void *pull_stream_handler_thread(void *arg)
         AVStream *stream = fmt_ctx->streams[i];
         char pix_fmt_str[16];
         av_get_pix_fmt_string(pix_fmt_str, sizeof(pix_fmt_str), (AVPixelFormat)stream->codecpar->format);
-        fprintf(stdout, "======= Stream Info =====\n");
-        printf("Stream %d:\n", i);
-        printf("  pixel_format: %s\n", pix_fmt_str);
-        printf("  codec_type: %s\n", av_get_media_type_string(stream->codecpar->codec_type));
-        printf("  codec_name: %s\n", avcodec_get_name(stream->codecpar->codec_id));
-        fprintf(stdout, "=========================\n");
+        log_info( "======= Stream Info =====");
+        log_info( "Stream %d:", i);
+        log_info( "  pixel_format: %s", pix_fmt_str);
+        log_info( "  codec_type: %s", av_get_media_type_string(stream->codecpar->codec_type));
+        log_info( "  codec_name: %s", avcodec_get_name(stream->codecpar->codec_id));
+        log_info( "=========================");
     }
-    fprintf(stdout, "Stream handler thread started. Pull stream: %s\n", args->input_stream_url);
+    log_info( "Stream handler thread started. Pull stream: %s", args->input_stream_url);
     Context *record_mp4_thread_ctx = CreateContext();
     Context *push_stream_thread_ctx = CreateContext();
     if (!record_mp4_thread_ctx || !push_stream_thread_ctx)
@@ -221,14 +222,14 @@ void *pull_stream_handler_thread(void *arg)
             ret = avcodec_send_packet(codec_ctx, origin_packet);
             if (ret < 0)
             {
-                fprintf(stdout, "Error: Failed to send packet to decoder (%s).\n", get_av_error(ret));
+                log_info( "Error: Failed to send packet to decoder (%s).", get_av_error(ret));
                 av_packet_unref(origin_packet);
                 continue;
             }
             AVFrame *origin_frame = av_frame_alloc();
             if (!origin_frame)
             {
-                fprintf(stdout, "Error: Failed to allocate frame(%s).\n", get_av_error(AVERROR(ENOMEM)));
+                log_info( "Error: Failed to allocate frame(%s).", get_av_error(AVERROR(ENOMEM)));
                 av_packet_unref(origin_packet);
                 continue;
             }
@@ -236,14 +237,14 @@ void *pull_stream_handler_thread(void *arg)
             ret = avcodec_receive_frame(codec_ctx, origin_frame);
             if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
             {
-                printf("No frame received from decoder.\n");
+                log_info( "No frame received from decoder.");
                 av_frame_free(&origin_frame);
                 av_packet_unref(origin_packet);
                 continue;
             }
             else if (ret < 0)
             {
-                fprintf(stdout, "Error: Failed to receive frame from decoder (%s).\n", get_av_error(ret));
+                log_info( "Error: Failed to receive frame from decoder (%s).", get_av_error(ret));
                 av_frame_free(&origin_frame);
                 av_packet_unref(origin_packet);
                 continue;
@@ -260,7 +261,7 @@ void *pull_stream_handler_thread(void *arg)
         }
         av_packet_unref(origin_packet);
     }
-    fprintf(stdout, "Stream handler thread stopped\n");
+    log_info( "push_stream_thread ended.");
     // 取消上下文并销毁互斥锁
     if (push_stream_thread_ctx)
     {

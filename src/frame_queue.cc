@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include "frame_queue.h"
+#include "logger.h"
+
 void free_queue_node(QueueItem *item)
 {
     if (item != NULL)
@@ -64,7 +66,7 @@ int enqueue(FrameQueue *q, QueueItem item)
     QueueNode *newNode = (QueueNode *)malloc(sizeof(QueueNode));
     if (newNode == NULL)
     {
-        perror("malloc failed");
+        log_error( "malloc failed");
         pthread_mutex_unlock(&q->lock);
         exit(EXIT_FAILURE);
     }

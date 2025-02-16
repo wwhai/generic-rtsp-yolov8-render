@@ -28,7 +28,7 @@
 #include "push_stream_thread.h"
 #include "warning_timer.h"
 #include <curl/curl.h>
-
+#include "logger.h"
 // 全局上下文指针数组
 Context *contexts[4];
 
@@ -42,7 +42,7 @@ void handle_signal(int sig)
             CancelContext(contexts[i]);
         }
     }
-    fprintf(stdout, "Received signal %d, exiting...\n", sig);
+    log_info("Received signal %d, exiting...", sig);
     exit(0);
 }
 
@@ -52,7 +52,7 @@ int create_thread(pthread_t *thread, void *(*start_routine)(void *), void *arg)
     int ret = pthread_create(thread, NULL, start_routine, arg);
     if (ret != 0)
     {
-        perror("Failed to create thread");
+        log_error( "Failed to create thread");
         return -1;
     }
     return 0;
@@ -89,31 +89,32 @@ void destroy_frame_queues(FrameQueue *queues, int num_queues)
 
 int main(int argc, char *argv[])
 {
+    set_log_level(LOG_DEBUG);
     // 检查命令行参数数量
     if (argc < 3)
     {
-        fprintf(stderr, "Usage: %s <camera_URL> <PUSH_URL>\n", argv[0]);
+        log_info("Usage: %s <camera_URL> <PUSH_URL>", argv[0]);
         return EXIT_FAILURE;
     }
 
     // 设置信号处理函数
     if (signal(SIGINT, handle_signal) == SIG_ERR)
     {
-        perror("Failed to set signal handler for SIGINT");
+        log_error( "Failed to set signal handler for SIGINT");
         return EXIT_FAILURE;
     }
 
     // 初始化告警计时器
     if (warning_timer_init(10000, 10, event_triggered) != 0)
     {
-        fprintf(stderr, "Failed to initialize warning timer\n");
+        log_info("Failed to initialize warning timer");
         return EXIT_FAILURE;
     }
 
     // 初始化cURL库
     if (curl_global_init(CURL_GLOBAL_ALL) != CURLE_OK)
     {
-        fprintf(stderr, "Failed to initialize cURL library\n");
+        log_info("Failed to initialize cURL library");
         warning_timer_stop();
         return EXIT_FAILURE;
     }
@@ -127,7 +128,7 @@ int main(int argc, char *argv[])
         contexts[i] = CreateContext();
         if (!contexts[i])
         {
-            fprintf(stderr, "Failed to create context %d\n", i);
+            log_info("Failed to create context %d", i);
             destroy_contexts();
             curl_global_cleanup();
             warning_timer_stop();
@@ -162,21 +163,15 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    fprintf(stdout, "Main thread waiting for threads to finish...\n");
+    log_info("Main thread waiting for threads to finish...");
 
-    // 分离线程
-    for (int i = 1; i < 4; i++)
+    // 等待所有线程结束
+    for (int i = 0; i < 4; i++)
     {
-        if (pthread_detach(threads[i]) != 0)
+        if (pthread_join(threads[i], NULL) != 0)
         {
-            perror("Failed to detach thread");
+            log_error( "Failed to join thread");
         }
-    }
-
-    // 等待后台线程结束
-    if (pthread_join(threads[0], NULL) != 0)
-    {
-        perror("Failed to join background thread");
     }
 
     // 清理资源

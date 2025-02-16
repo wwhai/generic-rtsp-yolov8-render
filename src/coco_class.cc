@@ -14,7 +14,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "coco_class.h"
-
+#include "logger.h"
 // 定义存储名称的数组
 const char *coco_names[80];
 void init_coco_names()
@@ -102,12 +102,12 @@ void init_coco_names()
 }
 void print_coco_names()
 {
-    fprintf(stdout, "===========coco names============ \n");
+    log_info( "===========coco names============ ");
     for (int i = 0; i < 80; i++)
     {
-        printf("  %d => %s\n", i, coco_names[i]);
+        log_info( "  %d => %s", i, coco_names[i]);
     }
-    fprintf(stdout, "================================= \n");
+    log_info( "================================= ");
 }
 
 const char *get_coco_name(int id)

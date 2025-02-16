@@ -1,72 +1,74 @@
-// Copyright (C) 2025 wwhai
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as
-// published by the Free Software Foundation, either version 3 of the
-// License, or (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Affero General Public License for more details.
-//
-// You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
 #include "video_renderer.h"
-#define TARGET_FPS 30                  // 目标帧率
+#include "logger.h"
+#define TARGET_FPS 25                  // 目标帧率
 #define FRAME_TIME (1000 / TARGET_FPS) // 每帧目标时间 (毫秒)
+
 void *video_renderer_thread(void *arg)
 {
+    // 检查输入参数是否为空
+    if (arg == NULL)
+    {
+        log_info( "Error: Input argument is NULL.");
+        return NULL;
+    }
     ThreadArgs *args = (ThreadArgs *)arg;
 
+    // 初始化 SDL 和 TTF
     if (SDL_Init(SDL_INIT_EVERYTHING) != 0)
     {
-        fprintf(stdout, "SDL_Init Error: %s\n", SDL_GetError());
+        log_info( "SDL_Init Error: %s", SDL_GetError());
         return NULL;
     }
     if (TTF_Init() == -1)
     {
-        fprintf(stdout, "SDL_ttf could not initialize! TTF_Error: %s\n", TTF_GetError());
+        log_info( "SDL_ttf could not initialize! TTF_Error: %s", TTF_GetError());
         SDL_Quit();
         return NULL;
     }
 
+    // 创建窗口
     SDL_Window *window = SDL_CreateWindow("VIDEO-PLAYER",
                                           SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
                                           1920, 1080, SDL_WINDOW_SHOWN);
     if (!window)
     {
-        fprintf(stdout, "SDL_CreateWindow Error: %s\n", SDL_GetError());
+        log_info( "SDL_CreateWindow Error: %s", SDL_GetError());
+        TTF_Quit();
         SDL_Quit();
         return NULL;
     }
 
+    // 创建渲染器
     SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if (!renderer)
     {
-        fprintf(stdout, "SDL_CreateRenderer Error: %s\n", SDL_GetError());
+        log_info( "SDL_CreateRenderer Error: %s", SDL_GetError());
         SDL_DestroyWindow(window);
+        TTF_Quit();
         SDL_Quit();
         return NULL;
     }
 
+    // 创建纹理
     SDL_Texture *texture = SDL_CreateTexture(renderer,
                                              SDL_PIXELFORMAT_YV12, SDL_TEXTUREACCESS_STREAMING,
                                              1920, 1080);
     if (!texture)
     {
-        fprintf(stdout, "SDL_CreateTexture Error: %s\n", SDL_GetError());
+        log_info( "SDL_CreateTexture Error: %s", SDL_GetError());
         SDL_DestroyRenderer(renderer);
         SDL_DestroyWindow(window);
+        TTF_Quit();
         SDL_Quit();
-        pthread_exit(NULL);
+        return NULL;
     }
+
     // 加载字体
     TTF_Font *font = TTF_OpenFont("mono.ttf", 18);
     if (font == NULL)
     {
-        fprintf(stdout, "Failed to load font! TTF_Error: %s\n", TTF_GetError());
+        log_info( "Failed to load font! TTF_Error: %s", TTF_GetError());
+        SDL_DestroyTexture(texture);
         SDL_DestroyRenderer(renderer);
         SDL_DestroyWindow(window);
         TTF_Quit();
@@ -81,14 +83,16 @@ void *video_renderer_thread(void *arg)
     Uint64 lastFrameTime = SDL_GetPerformanceCounter();
     Uint64 performanceFrequency = SDL_GetPerformanceFrequency();
     SDL_Event event;
-    // loop
+
+    // 主循环
     while (1)
     {
         Uint32 frameStart = SDL_GetTicks();
 
+        // 检查上下文是否被取消
         if (args->ctx->is_cancelled)
         {
-            goto END;
+            break;
         }
 
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
@@ -109,12 +113,13 @@ void *video_renderer_thread(void *arg)
                                                newFrame->data[2], newFrame->linesize[2]);
                 if (ret < 0)
                 {
-                    fprintf(stdout, "SDL_UpdateYUVTexture failed: %s\n", SDL_GetError());
+                    log_info( "SDL_UpdateYUVTexture failed: %s", SDL_GetError());
                 }
                 av_frame_free(&newFrame);
             }
         }
         SDL_RenderCopy(renderer, texture, NULL, NULL);
+
         // 处理检测结果队列
         QueueItem boxes_item;
         if (async_dequeue(args->box_queue, &boxes_item))
@@ -123,12 +128,17 @@ void *video_renderer_thread(void *arg)
             {
                 for (int i = 0; i < boxes_item.box_count; ++i)
                 {
-                    SDLDrawBox(renderer, font, boxes_item.Boxes[i].label,
-                               boxes_item.Boxes[i].x, boxes_item.Boxes[i].y,
-                               boxes_item.Boxes[i].w, boxes_item.Boxes[i].h, 1);
+                    // 检查边界框数据是否有效
+                    if (boxes_item.Boxes != NULL)
+                    {
+                        SDLDrawBox(renderer, font, boxes_item.Boxes[i].label,
+                                   boxes_item.Boxes[i].x, boxes_item.Boxes[i].y,
+                                   boxes_item.Boxes[i].w, boxes_item.Boxes[i].h, 1);
+                    }
                 }
             }
         }
+
         // 计算FPS并显示
         frameCount++;
         currentFrameTime = SDL_GetPerformanceCounter();
@@ -159,25 +169,42 @@ void *video_renderer_thread(void *arg)
         {
             if (event.type == SDL_QUIT)
             {
-                goto END;
+                break;
             }
             else if (event.type == SDL_KEYDOWN)
             {
                 if (event.key.keysym.sym == SDLK_ESCAPE)
                 {
-                    goto END;
+                    break;
                 }
             }
         }
+        if (event.type == SDL_QUIT || event.key.keysym.sym == SDLK_ESCAPE)
+        {
+            break;
+        }
     }
 
-END:
-    SDL_DestroyTexture(texture);
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
-    TTF_CloseFont(font);
+    // 资源释放
+    if (texture)
+    {
+        SDL_DestroyTexture(texture);
+    }
+    if (renderer)
+    {
+        SDL_DestroyRenderer(renderer);
+    }
+    if (window)
+    {
+        SDL_DestroyWindow(window);
+    }
+    if (font)
+    {
+        TTF_CloseFont(font);
+    }
     TTF_Quit();
     SDL_Quit();
-    pthread_exit(NULL);
+
+    log_info( "video_renderer_thread exit");
     return NULL;
 }
