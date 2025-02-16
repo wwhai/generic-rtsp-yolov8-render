@@ -20,10 +20,10 @@
 size_t write_callback(void *contents, size_t size, size_t nmemb, void *userp)
 {
     size_t realsize = size * nmemb;
-    log_info( "=== http write callback === %.*s", (int)realsize, (char *)contents);
+    log_info("=== http write callback === %.*s", (int)realsize, (char *)contents);
     return realsize;
 }
-void post_recognized_type(const char *url, int type, const char *device_uuid)
+void post_recognized_type(const char *url, const char *type, const char *device_uuid)
 {
     char json_body[256];
     time_t now = time(NULL);
@@ -31,8 +31,8 @@ void post_recognized_type(const char *url, int type, const char *device_uuid)
     char ts[20];
     tm_info = localtime(&now);
     strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S", tm_info);
-    snprintf(json_body, sizeof(json_body), "{\"type\": %d, \"ts\": \"%s\", \"device_uuid\": \"%s\"}", type, ts, device_uuid);
-    log_info( "====== post_recognized_type json_body ======");
-    log_info( "POST: %s, Body: %s", url, json_body);
-    log_info( "============================================");
+    snprintf(json_body, sizeof(json_body), "{\"type\": %s, \"ts\": \"%s\", \"device_uuid\": \"%s\"}", type, ts, device_uuid);
+    log_info("====== post_recognized_type json_body ======");
+    log_info("POST: %s, Body: %s", url, json_body);
+    log_info("============================================");
 }

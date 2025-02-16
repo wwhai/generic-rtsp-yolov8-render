@@ -22,5 +22,5 @@
 // 回调函数，用于处理响应数据
 size_t write_callback(void *contents, size_t size, size_t nmemb, void *userp);
 // 打印表示识别类型的 JSON 字符串的函数，增加时间戳和上传者 UUID
-void post_recognized_type(const char *url, int type, const char *device_uuid);
+void post_recognized_type(const char *url, const char *type, const char *device_uuid);
 #endif
